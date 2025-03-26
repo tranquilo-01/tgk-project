@@ -43,7 +43,7 @@ export class Game extends Scene {
             const TWS = this.TWS
             const GWD = this.GWD
             const AWS = utils.calculateAWS(this.boat, GWD, TWS)
-            const AWA = utils.calculateAWA(this.boat, GWD)
+            const AWA = utils.calculateAWA(this.boat, GWD, TWS)
 
             overlay.setText(`Heading: ${heading}\nCOG: ${cog}\nSOG: ${sog}\nPosition: ${position}\nTWS: ${TWS}\nGWD: ${GWD}\nAWS: ${AWS} AWA: ${AWA}`);
         });
