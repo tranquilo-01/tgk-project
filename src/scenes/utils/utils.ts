@@ -24,8 +24,10 @@ export const calculatePosition = (boat: MatterJS.BodyType) => {
 }
 
 export const calculateAWS = (boat: MatterJS.BodyType, GWD: number, TWS: number) => {
-    const angleBetweenBoatAndWind = Math.abs(GWD - calculateCOG(boat))
-    return Math.abs(Math.floor(Math.sqrt(boat.velocity.x ** 2 + boat.velocity.y ** 2) * Math.cos(angleBetweenBoatAndWind) + TWS))
+    const windRadians = ((GWD - 180) * Math.PI) / 180;
+    const windVector: MatterJS.Vector = { x: Math.sin(windRadians) * TWS, y: Math.cos(windRadians) * TWS }
+    const apparentWindVector: MatterJS.Vector = { x: - boat.velocity.x + windVector.x, y: - boat.velocity.y + windVector.y }
+    return Math.sqrt(apparentWindVector.x ** 2 + apparentWindVector.y ** 2).toFixed(1)
 }
 
 export const calculateAWA = (boat: MatterJS.BodyType, GWD: number, TWS: number) => {

@@ -20,15 +20,8 @@ export class Game extends Scene {
         this.camera = this.cameras.main
         this.camera.centerOn(0, 0)
 
-
-        // this.boat.frictionAir = 0.07
-
-
-
         this.boat = this.matter.add.rectangle(40, 40, 10, 30)
         this.boat = this.matter.add.trapezoid(0, 0, 20, 30, 0.5);
-
-        // this.camera.startFollow(this.boat, false, 0.05, 0.05, 0, 0);
 
         this.registerWSAD()
 
@@ -45,7 +38,7 @@ export class Game extends Scene {
             const AWS = utils.calculateAWS(this.boat, GWD, TWS)
             const AWA = utils.calculateAWA(this.boat, GWD, TWS)
 
-            overlay.setText(`Heading: ${heading}\nCOG: ${cog}\nSOG: ${sog}\nPosition: ${position}\nTWS: ${TWS}\nGWD: ${GWD}\nAWS: ${AWS} AWA: ${AWA}`);
+            overlay.setText(`Heading: ${heading}\nCOG: ${cog}\nSOG: ${sog}\nPosition: ${Math.floor(position.x)}, ${Math.floor(position.y)}\nTWS: ${TWS}\nGWD: ${GWD}\nAWS: ${AWS} AWA: ${AWA}`);
         });
     }
 
