@@ -1,11 +1,11 @@
 import { Scene } from 'phaser';
-import * as utils from './utils/utils';
+import { Boat } from './objects/boat';
 
 export class Game extends Scene {
     camera: Phaser.Cameras.Scene2D.Camera
     background: Phaser.GameObjects.TileSprite
     cursors: Phaser.Types.Input.Keyboard.CursorKeys
-    boat: MatterJS.BodyType
+    boat: Boat
     rect: MatterJS.BodyType
 
     GWD: number = 90
@@ -18,10 +18,7 @@ export class Game extends Scene {
 
     create() {
         this.camera = this.cameras.main
-        this.camera.centerOn(0, 0)
-
-        this.boat = this.matter.add.rectangle(40, 40, 10, 30)
-        this.boat = this.matter.add.trapezoid(0, 0, 20, 30, 0.5);
+        this.boat = new Boat(this.matter.add.trapezoid(0, 0, 20, 30, 0.5), 20, 30, 12000)
 
         this.registerWSAD()
 
@@ -29,22 +26,24 @@ export class Game extends Scene {
         const overlay = this.add.text(10, 10, '', style).setScrollFactor(0);
 
         this.events.on('update', () => {
-            const heading = utils.calculateHdg(this.boat);
-            const cog = utils.calculateCOG(this.boat);
-            const sog = utils.calculateSOG(this.boat);
-            const position = utils.calculatePosition(this.boat);
+            const heading = this.boat.getHeading();
+            const cog = this.boat.getCOG();
+            const sog = this.boat.getSOG();
+            const position = this.boat.getPosition();
             const TWS = this.TWS
             const GWD = this.GWD
-            const AWS = utils.calculateAWS(this.boat, GWD, TWS)
-            const AWA = utils.calculateAWA(this.boat, GWD, TWS)
+            const AWS = this.boat.getAWS(GWD, TWS)
+            const AWA = this.boat.getAWA(GWD, TWS)
+
 
             overlay.setText(`Heading: ${heading}\nCOG: ${cog}\nSOG: ${sog}\nPosition: ${Math.floor(position.x)}, ${Math.floor(position.y)}\nTWS: ${TWS}\nGWD: ${GWD}\nAWS: ${AWS} AWA: ${AWA}`);
         });
     }
 
     update() {
-        this.moveWithWSAD(this.boat)
-        this.camera.setScroll(this.boat.position.x - this.camera.height / 2, this.boat.position.y - this.camera.width / 2)
+        this.moveWithWSAD(this.boat.body)
+        this.camera.setScroll(this.boat.getPosition().x - this.camera.height / 2, this.boat.getPosition().y - this.camera.width / 2)
+        // this.matter.body.applyForce(this.boat, this.boat.position, { x: 0, y: -0.01 });
     }
 
     registerWSAD() {
@@ -63,7 +62,7 @@ export class Game extends Scene {
 
         const rotation = object.angle;
 
-        const forceMagnitude = 1 / (object.mass * 10000);
+        const forceMagnitude = 1; // Adjust the force magnitude as needed
         const forceX = Math.sin(rotation) * forceMagnitude;
         const forceY = -Math.cos(rotation) * forceMagnitude;
 
