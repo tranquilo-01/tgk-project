@@ -42,8 +42,8 @@ export class Game extends Scene {
 
     update() {
         this.moveWithWSAD(this.boat.body)
+        this.boat.applyFrictionForces()
         this.camera.setScroll(this.boat.getPosition().x - this.camera.height / 2, this.boat.getPosition().y - this.camera.width / 2)
-        // this.matter.body.applyForce(this.boat, this.boat.position, { x: 0, y: -0.01 });
     }
 
     registerWSAD() {
@@ -62,21 +62,21 @@ export class Game extends Scene {
 
         const rotation = object.angle;
 
-        const forceMagnitude = 1; // Adjust the force magnitude as needed
+        const forceMagnitude = 3; // Adjust the force magnitude as needed
         const forceX = Math.sin(rotation) * forceMagnitude;
         const forceY = -Math.cos(rotation) * forceMagnitude;
 
         if (wKey.isDown) {
-            this.matter.body.applyForce(object, object.position, { x: forceX, y: forceY });
+            this.boat.applyForce({ x: forceX, y: forceY });
         }
         if (sKey.isDown) {
-            this.matter.body.applyForce(object, object.position, { x: -forceX, y: -forceY });
+            this.boat.applyForce({ x: -forceX, y: -forceY });
         }
         if (aKey.isDown) {
-            this.matter.body.rotate(object, -0.01);
+            this.boat.rotate(-0.001);
         }
         if (dKey.isDown) {
-            this.matter.body.rotate(object, 0.01);
+            this.boat.rotate(0.001);
         }
     }
 }

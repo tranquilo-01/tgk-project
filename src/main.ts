@@ -21,7 +21,11 @@ const config: Types.Core.GameConfig = {
                 x: 0,
                 y: 0
             },
-            debug: true
+            debug: {
+                showAngleIndicator: true,
+                showVelocity: true,
+            },
+            setBounds: false
         }
     },
     scale: {

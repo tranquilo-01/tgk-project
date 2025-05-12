@@ -16,6 +16,24 @@ export class Boat {
 		this.body.restitution = 0;
 	}
 
+	applyFrictionForces() {
+		const hullDragForce = this.getFrictionResistance();
+		const waveDragForce = this.getApproximatedWaveResistance();
+		const totalDragForce = hullDragForce + waveDragForce;
+		const dragAngle = Math.atan2(this.body.velocity.y, this.body.velocity.x);
+		const dragVector: MatterJS.Vector = { x: -totalDragForce * Math.cos(dragAngle), y: -totalDragForce * Math.sin(dragAngle) }
+		this.applyForce(dragVector);
+	}
+
+	applyForce(force: MatterJS.Vector) {
+		this.body.force.x += force.x;
+		this.body.force.y += force.y;
+	}
+
+	rotate(angle: number) {
+		this.body.angle += angle;
+	}
+
 	getDisplacement(): number {
 		return this.wettedArea * this.length; // example
 	}
@@ -62,7 +80,7 @@ export class Boat {
 
 	getFrictionResistance = () => {
 		const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.y ** 2);
-		const dragCoefficient = 0.01; // TODO: placeholder value, should be calculated based on the hull shape and other factors
+		const dragCoefficient = 0.001; // TODO: placeholder value, should be calculated based on the hull shape and other factors
 		const area = 20; // wetted area in m^2
 		const roCoefficent = 52; // marchaj page 52
 		const dragForce = 0.5 * dragCoefficient * area * roCoefficent * speed ** 2;
@@ -70,7 +88,7 @@ export class Boat {
 	}
 
 	getApproximatedFrictionResistance = () => {
-		const coef = 0.5
+		const coef = 0.2
 		const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.y ** 2);
 		return 0.5 * speed ** 2 * coef
 	}
