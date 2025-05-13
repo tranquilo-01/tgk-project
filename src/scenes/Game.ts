@@ -18,7 +18,8 @@ export class Game extends Scene {
 
     create() {
         this.camera = this.cameras.main
-        this.boat = new Boat(this.matter.add.trapezoid(0, 0, 20, 30, 0.5), 20, 30, 12000)
+        this.background = this.add.tileSprite(0, 0, 10000, 10000, 'sea');
+        this.boat = new Boat(this.matter.add.trapezoid(0, 0, 20, 30, 0.5), 20, 30, 12000, 4.5);
 
         this.registerWSAD()
 
@@ -36,14 +37,26 @@ export class Game extends Scene {
             const AWA = this.boat.getAWA(GWD, TWS)
 
 
-            overlay.setText(`Heading: ${heading}\nCOG: ${cog}\nSOG: ${sog}\nPosition: ${Math.floor(position.x)}, ${Math.floor(position.y)}\nTWS: ${TWS}\nGWD: ${GWD}\nAWS: ${AWS} AWA: ${AWA}`);
+            overlay.setText(`
+            Heading: ${heading}
+            COG: ${cog}
+            SOG: ${sog}
+            Position: ${Math.floor(position.x)}, ${Math.floor(position.y)}
+            TWS: ${TWS} GWD: ${GWD}
+            AWS: ${AWS} AWA: ${AWA}
+            Tack: ${this.boat.getTack(GWD, TWS)}
+            Sail Angle: ${this.boat.getSailAngle(AWA)}
+            Friction Resistance: ${this.boat.getFrictionResistance()}
+            Wave Resistance: ${this.boat.getApproximatedWaveResistance()}
+            Total Resistance: ${this.boat.getFrictionResistance() + this.boat.getApproximatedWaveResistance()}`);
         });
     }
 
     update() {
         this.moveWithWSAD(this.boat.body)
         this.boat.applyFrictionForces()
-        this.camera.setScroll(this.boat.getPosition().x - this.camera.height / 2, this.boat.getPosition().y - this.camera.width / 2)
+        // this.camera.setScroll(this.boat.getPosition().x - this.scale.height / 2, this.boat.getPosition().y - this.scale.width / 2)
+        this.camera.centerOn(this.boat.getPosition().x, this.boat.getPosition().y);
     }
 
     registerWSAD() {
@@ -62,7 +75,7 @@ export class Game extends Scene {
 
         const rotation = object.angle;
 
-        const forceMagnitude = 3; // Adjust the force magnitude as needed
+        const forceMagnitude = 5; // Adjust the force magnitude as needed
         const forceX = Math.sin(rotation) * forceMagnitude;
         const forceY = -Math.cos(rotation) * forceMagnitude;
 

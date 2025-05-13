@@ -6,23 +6,62 @@ export class Boat {
 	body: MatterJS.BodyType;
 	wettedArea: number;
 	length: number;
+	sailArea: number;
+	trimmedSailAngle: number;
+	lowerSailTrimLimit: number;
+	upperSailTrimLimit: number;
+	hullSpeed: number;
 
-	constructor(body: MatterJS.BodyType, wettedArea: number, length: number, mass: number) {
+	constructor(body: MatterJS.BodyType, wettedArea: number, length: number, mass: number, hullSpeed: number) {
 		this.body = body;
 		this.wettedArea = wettedArea;
 		this.length = length;
 		this.body.frictionAir = 0;
 		this.body.mass = mass;
 		this.body.restitution = 0;
+		this.trimmedSailAngle = 45;
+		this.lowerSailTrimLimit = 15;
+		this.upperSailTrimLimit = 90;
+		this.hullSpeed = hullSpeed;
 	}
 
 	applyFrictionForces() {
 		const hullDragForce = this.getFrictionResistance();
 		const waveDragForce = this.getApproximatedWaveResistance();
+		// const waveDragForce = 0;
 		const totalDragForce = hullDragForce + waveDragForce;
 		const dragAngle = Math.atan2(this.body.velocity.y, this.body.velocity.x);
 		const dragVector: MatterJS.Vector = { x: -totalDragForce * Math.cos(dragAngle), y: -totalDragForce * Math.sin(dragAngle) }
 		this.applyForce(dragVector);
+	}
+
+	takeSail() {
+		if (this.trimmedSailAngle > this.lowerSailTrimLimit) {
+			this.trimmedSailAngle -= 0.5;
+		}
+	}
+
+	giveSail() {
+		if (this.trimmedSailAngle < this.upperSailTrimLimit) {
+			this.trimmedSailAngle += 0.5;
+		}
+	}
+
+	getSailAngle(awa: number): number {
+		if (awa < 180) {
+			return this.trimmedSailAngle;
+		} else {
+			return - this.trimmedSailAngle;
+		}
+	}
+
+	getTack(GWD: number, TWS: number): string {
+		const awa = this.getAWA(GWD, TWS);
+		if (awa < 180) {
+			return "starboard";
+		} else {
+			return "port";
+		}
 	}
 
 	applyForce(force: MatterJS.Vector) {
@@ -75,15 +114,15 @@ export class Boat {
 		const windRadians = ((GWD - 180) * Math.PI) / 180;
 		const windVector: MatterJS.Vector = { x: Math.sin(windRadians) * TWS, y: Math.cos(windRadians) * TWS }
 		const apparentWindVector: MatterJS.Vector = { x: - this.body.velocity.x + windVector.x, y: - this.body.velocity.y + windVector.y }
-		return (540 + utils.vectorHeading(apparentWindVector) - this.getCOG()) % 360 // where wind comes from not where it goes
+		return (540 + utils.vectorHeading(apparentWindVector) - this.getHeading()) % 360 // where wind comes from not where it goes
 	}
 
 	getFrictionResistance = () => {
 		const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.y ** 2);
-		const dragCoefficient = 0.001; // TODO: placeholder value, should be calculated based on the hull shape and other factors
+		const dragCoefficient = 0.0001; // TODO: placeholder value, should be calculated based on the hull shape and other factors
 		const area = 20; // wetted area in m^2
 		const roCoefficent = 52; // marchaj page 52
-		const dragForce = 0.5 * dragCoefficient * area * roCoefficent * speed ** 2;
+		const dragForce = 0.5 * dragCoefficient * area * roCoefficent * speed ** 2 + 0.3 * Math.pow(speed, 0.5);
 		return dragForce;
 	}
 
@@ -94,13 +133,10 @@ export class Boat {
 	}
 
 	getApproximatedWaveResistance = () => {
-		const lengthM = 14;
-		const lengthFeet = lengthM * 3.28084;
+
 		const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.y ** 2);
 
-		const hullSpeed = 1.34 * Math.sqrt(lengthFeet);
-
-		const force = 0.5 * (speed ** 5 / hullSpeed ** 5 + Math.pow(3, speed - hullSpeed))
+		const force = (speed ** 5 / this.hullSpeed ** 5 + Math.pow(3, speed - this.hullSpeed))
 		return force
 	}
 }
