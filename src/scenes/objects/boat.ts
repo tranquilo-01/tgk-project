@@ -28,11 +28,14 @@ export class Boat {
 	applyFrictionForces() {
 		const hullDragForce = this.getFrictionResistance();
 		const waveDragForce = this.getApproximatedWaveResistance();
-		// const waveDragForce = 0;
 		const totalDragForce = hullDragForce + waveDragForce;
 		const dragAngle = Math.atan2(this.body.velocity.y, this.body.velocity.x);
 		const dragVector: MatterJS.Vector = { x: -totalDragForce * Math.cos(dragAngle), y: -totalDragForce * Math.sin(dragAngle) }
 		this.applyForce(dragVector);
+
+		const getAntiDriftForce = this.getAntiDriftForce();
+		this.applyForce(getAntiDriftForce);
+		this.applyAntiRotationTorque();
 	}
 
 	takeSail() {
@@ -69,8 +72,13 @@ export class Boat {
 		this.body.force.y += force.y;
 	}
 
-	rotate(angle: number) {
-		this.body.angle += angle;
+	applyTorque(torque: number) {
+		this.body.torque += torque;
+	}
+
+	applyAntiRotationTorque() {
+		const sign = - Math.sign(this.body.angularVelocity);
+		this.body.torque += sign * 0.0002;
 	}
 
 	getDisplacement(): number {
@@ -102,6 +110,55 @@ export class Boat {
 	getPosition(): MatterJS.Vector {
 		return this.body.position;
 	}
+
+	getDriftVector(): MatterJS.Vector {
+		const velocityX = this.body.velocity.x;
+		const velocityY = this.body.velocity.y;
+
+		const headingAngle = this.body.angle - Math.PI / 2;
+
+		const headingX = Math.cos(headingAngle);
+		const headingY = Math.sin(headingAngle);
+
+		const dot = velocityX * headingX + velocityY * headingY;
+
+		const vParallelX = dot * headingX;
+		const vParallelY = dot * headingY;
+
+		const driftX = velocityX - vParallelX;
+		const driftY = velocityY - vParallelY;
+
+		return { x: driftX, y: driftY };
+	}
+
+	getDriftSpeed(): number {
+		const driftVector = this.getDriftVector();
+		return Math.sqrt(driftVector.x ** 2 + driftVector.y ** 2);
+	}
+
+	getAntiDriftForce(): MatterJS.Vector {
+		const driftVector = this.getDriftVector();
+		const driftSpeed = Math.sqrt(driftVector.x ** 2 + driftVector.y ** 2);
+
+		if (driftSpeed === 0) {
+			return { x: 0, y: 0 }; // No drift, no force needed
+		}
+
+		const dragCoefficient = 0.01;
+		const area = 20; // Wetted area in m^2
+		const roCoefficient = 52; // From Marchaj, page 52
+
+		const dragForceMagnitude = 0.5 * dragCoefficient * area * roCoefficient * driftSpeed ** 2 + 0.3 * Math.pow(driftSpeed, 0.5);
+
+		const unitDriftX = driftVector.x / driftSpeed;
+		const unitDriftY = driftVector.y / driftSpeed;
+
+		const forceX = -unitDriftX * dragForceMagnitude;
+		const forceY = -unitDriftY * dragForceMagnitude;
+
+		return { x: forceX, y: forceY };
+	}
+
 
 	getAWS(GWD: number, TWS: number): number {
 		const windRadians = ((GWD - 180) * Math.PI) / 180;

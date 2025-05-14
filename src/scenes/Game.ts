@@ -48,7 +48,8 @@ export class Game extends Scene {
             Sail Angle: ${this.boat.getSailAngle(AWA)}
             Friction Resistance: ${this.boat.getFrictionResistance()}
             Wave Resistance: ${this.boat.getApproximatedWaveResistance()}
-            Total Resistance: ${this.boat.getFrictionResistance() + this.boat.getApproximatedWaveResistance()}`);
+            Total Resistance: ${this.boat.getFrictionResistance() + this.boat.getApproximatedWaveResistance()}
+            Drift Speed: ${this.boat.getDriftSpeed()}`);
         });
     }
 
@@ -86,10 +87,10 @@ export class Game extends Scene {
             this.boat.applyForce({ x: -forceX, y: -forceY });
         }
         if (aKey.isDown) {
-            this.boat.rotate(-0.001);
+            this.boat.applyTorque(-0.0003);
         }
         if (dKey.isDown) {
-            this.boat.rotate(0.001);
+            this.boat.applyTorque(0.0003);
         }
     }
 }
