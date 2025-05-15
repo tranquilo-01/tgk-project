@@ -1,5 +1,7 @@
 import { Scene } from 'phaser';
 import { Boat } from './objects/boat';
+import * as utils from './utils/utils';
+
 
 export class Game extends Scene {
     camera: Phaser.Cameras.Scene2D.Camera
@@ -20,6 +22,7 @@ export class Game extends Scene {
         this.camera = this.cameras.main
         this.background = this.add.tileSprite(0, 0, 10000, 10000, 'sea');
         this.boat = new Boat(this.matter.add.trapezoid(0, 0, 20, 30, 0.5), 20, 30, 12000, 4.5);
+        this.boat.updateWindData(this.TWS, this.GWD)
 
         this.registerWSAD()
 
@@ -33,8 +36,8 @@ export class Game extends Scene {
             const position = this.boat.getPosition();
             const TWS = this.TWS
             const GWD = this.GWD
-            const AWS = this.boat.getAWS(GWD, TWS)
-            const AWA = this.boat.getAWA(GWD, TWS)
+            const AWS = this.boat.getAWS()
+            const AWA = this.boat.getAWA()
 
 
             overlay.setText(`
@@ -44,18 +47,21 @@ export class Game extends Scene {
             Position: ${Math.floor(position.x)}, ${Math.floor(position.y)}
             TWS: ${TWS} GWD: ${GWD}
             AWS: ${AWS} AWA: ${AWA}
-            Tack: ${this.boat.getTack(GWD, TWS)}
+            Tack: ${this.boat.getTack()}
             Sail Angle: ${this.boat.getSailAngle(AWA)}
             Friction Resistance: ${this.boat.getFrictionResistance()}
             Wave Resistance: ${this.boat.getApproximatedWaveResistance()}
             Total Resistance: ${this.boat.getFrictionResistance() + this.boat.getApproximatedWaveResistance()}
-            Drift Speed: ${this.boat.getDriftSpeed()}`);
+            Drift Speed: ${this.boat.getDriftSpeed()}
+            LiftVectorHeading: ${utils.vectorHeading(this.boat.getLiftUnitVector())}`);
         });
     }
 
     update() {
+        this.boat.updateWindData(this.TWS, this.GWD)
         this.moveWithWSAD(this.boat.body)
         this.boat.applyFrictionForces()
+        this.boat.applyTestSailForce()
         // this.camera.setScroll(this.boat.getPosition().x - this.scale.height / 2, this.boat.getPosition().y - this.scale.width / 2)
         this.camera.centerOn(this.boat.getPosition().x, this.boat.getPosition().y);
     }
