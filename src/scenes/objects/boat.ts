@@ -1,5 +1,6 @@
 import * as utils from '../utils/utils';
 // https://support.garmin.com/en-US/?faq=e5LwusViLZ95VTDwn2Alt7
+//https://en.wikipedia.org/wiki/Forces_on_sails
 
 
 export class Boat {
@@ -26,10 +27,12 @@ export class Boat {
 		this.hullSpeed = hullSpeed;
 	}
 
+	// --------------------environment data-----------------
 	updateWindData(TWS: number, GWD: number) {
 		this.windData = { TWS, GWD };
 	}
 
+	// ----------------------apply forces-----------------
 	applyFrictionForces() {
 		const hullDragForce = this.getFrictionResistance();
 		const waveDragForce = this.getApproximatedWaveResistance();
@@ -43,6 +46,78 @@ export class Boat {
 		this.applyAntiRotationTorque();
 	}
 
+	applyForce(force: MatterJS.Vector) {
+		this.body.force.x += force.x;
+		this.body.force.y += force.y;
+	}
+
+	applyTorque(torque: number) {
+		this.body.torque += torque;
+	}
+
+	applyAntiRotationTorque() {
+		const sign = - Math.sign(this.body.angularVelocity);
+		this.body.torque += sign * 0.0002;
+	}
+
+	applyTestSailForce() {
+		const liftUnitVector = this.getLiftUnitVector();
+		const liftForceMagnitude = 3;
+
+		const liftForceX = liftUnitVector.x * liftForceMagnitude;
+		const liftForceY = liftUnitVector.y * liftForceMagnitude;
+		const liftForce: MatterJS.Vector = { x: liftForceX, y: liftForceY };
+		this.applyForce(liftForce);
+	}
+
+	// --------------------forces---------------------
+	getAntiDriftForce(): MatterJS.Vector {
+		const driftVector = this.getDriftVector();
+		const driftSpeed = Math.sqrt(driftVector.x ** 2 + driftVector.y ** 2);
+
+		if (driftSpeed === 0) {
+			return { x: 0, y: 0 }; // No drift, no force needed
+		}
+
+		const dragCoefficient = 0.01;
+		const area = 20; // Wetted area in m^2
+		const roCoefficient = 52; // From Marchaj, page 52
+
+		const dragForceMagnitude = 0.5 * dragCoefficient * area * roCoefficient * driftSpeed ** 2 + 0.3 * Math.pow(driftSpeed, 0.5);
+
+		const unitDriftX = driftVector.x / driftSpeed;
+		const unitDriftY = driftVector.y / driftSpeed;
+
+		const forceX = -unitDriftX * dragForceMagnitude;
+		const forceY = -unitDriftY * dragForceMagnitude;
+
+		return { x: forceX, y: forceY };
+	}
+
+	getFrictionResistance = () => {
+		const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.y ** 2);
+		const dragCoefficient = 0.0001;
+		const area = 20; // wetted area in m^2
+		const roCoefficent = 52; // marchaj page 52
+		const dragForce = 0.5 * dragCoefficient * area * roCoefficent * speed ** 2 + 0.3 * Math.pow(speed, 0.5);
+		return dragForce;
+	}
+
+	getApproximatedFrictionResistance = () => {
+		const coef = 0.2
+		const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.y ** 2);
+		return 0.5 * speed ** 2 * coef
+	}
+
+	getApproximatedWaveResistance = () => {
+
+		const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.y ** 2);
+
+		const force = (speed ** 5 / this.hullSpeed ** 5 + Math.pow(3, speed - this.hullSpeed))
+		return force
+	}
+
+	// --------------------sails---------------------
 	takeSail() {
 		if (this.trimmedSailAngle > this.lowerSailTrimLimit) {
 			this.trimmedSailAngle -= 0.5;
@@ -63,6 +138,20 @@ export class Boat {
 		}
 	}
 
+	getLiftUnitVector(): MatterJS.Vector {
+		const heading = this.getHeading();
+		let liftDirection = 0
+		if (this.getTack() === "starboard") {
+			liftDirection = (heading - 90 + this.trimmedSailAngle) % 360;
+		} else {
+			liftDirection = (heading + 90 - this.trimmedSailAngle) % 360;
+		}
+		const liftRadians = utils.degreesToRadians(liftDirection - 90);
+		const liftX = Math.cos(liftRadians);
+		const liftY = Math.sin(liftRadians);
+		return { x: liftX, y: liftY };
+	}
+
 	getTack(): string {
 		const awa = this.getAWA();
 		if (awa < 180) {
@@ -72,24 +161,7 @@ export class Boat {
 		}
 	}
 
-	applyForce(force: MatterJS.Vector) {
-		this.body.force.x += force.x;
-		this.body.force.y += force.y;
-	}
-
-	applyTorque(torque: number) {
-		this.body.torque += torque;
-	}
-
-	applyAntiRotationTorque() {
-		const sign = - Math.sign(this.body.angularVelocity);
-		this.body.torque += sign * 0.0002;
-	}
-
-	getDisplacement(): number {
-		return this.wettedArea * this.length; // example
-	}
-
+	// --------------------plotter data--------------------
 	getHeading(): number {
 		if (utils.radiansToDegrees(this.body.angle) < 0) {
 			return Math.floor(360 + (utils.radiansToDegrees(this.body.angle) % 360))
@@ -114,30 +186,6 @@ export class Boat {
 
 	getPosition(): MatterJS.Vector {
 		return this.body.position;
-	}
-
-	getLiftUnitVector(): MatterJS.Vector {
-		const heading = this.getHeading();
-		let liftDirection = 0
-		if (this.getTack() === "starboard") {
-			liftDirection = (heading - 90 + this.trimmedSailAngle) % 360;
-		} else {
-			liftDirection = (heading + 90 - this.trimmedSailAngle) % 360;
-		}
-		const liftRadians = utils.degreesToRadians(liftDirection - 90);
-		const liftX = Math.cos(liftRadians);
-		const liftY = Math.sin(liftRadians);
-		return { x: liftX, y: liftY };
-	}
-
-	applyTestSailForce() {
-		const liftUnitVector = this.getLiftUnitVector();
-		const liftForceMagnitude = 3;
-
-		const liftForceX = liftUnitVector.x * liftForceMagnitude;
-		const liftForceY = liftUnitVector.y * liftForceMagnitude;
-		const liftForce: MatterJS.Vector = { x: liftForceX, y: liftForceY };
-		this.applyForce(liftForce);
 	}
 
 	getDriftVector(): MatterJS.Vector {
@@ -165,29 +213,6 @@ export class Boat {
 		return Math.sqrt(driftVector.x ** 2 + driftVector.y ** 2);
 	}
 
-	getAntiDriftForce(): MatterJS.Vector {
-		const driftVector = this.getDriftVector();
-		const driftSpeed = Math.sqrt(driftVector.x ** 2 + driftVector.y ** 2);
-
-		if (driftSpeed === 0) {
-			return { x: 0, y: 0 }; // No drift, no force needed
-		}
-
-		const dragCoefficient = 0.01;
-		const area = 20; // Wetted area in m^2
-		const roCoefficient = 52; // From Marchaj, page 52
-
-		const dragForceMagnitude = 0.5 * dragCoefficient * area * roCoefficient * driftSpeed ** 2 + 0.3 * Math.pow(driftSpeed, 0.5);
-
-		const unitDriftX = driftVector.x / driftSpeed;
-		const unitDriftY = driftVector.y / driftSpeed;
-
-		const forceX = -unitDriftX * dragForceMagnitude;
-		const forceY = -unitDriftY * dragForceMagnitude;
-
-		return { x: forceX, y: forceY };
-	}
-
 
 	getAWS(): number {
 		const windRadians = ((this.windData.GWD - 180) * Math.PI) / 180;
@@ -203,27 +228,11 @@ export class Boat {
 		return (540 + utils.vectorHeading(apparentWindVector) - this.getHeading()) % 360 // where wind comes from not where it goes
 	}
 
-	getFrictionResistance = () => {
-		const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.y ** 2);
-		const dragCoefficient = 0.0001;
-		const area = 20; // wetted area in m^2
-		const roCoefficent = 52; // marchaj page 52
-		const dragForce = 0.5 * dragCoefficient * area * roCoefficent * speed ** 2 + 0.3 * Math.pow(speed, 0.5);
-		return dragForce;
+
+	// ---------------------boat data--------------------
+	getDisplacement(): number {
+		return this.wettedArea * this.length; // example
 	}
 
-	getApproximatedFrictionResistance = () => {
-		const coef = 0.2
-		const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.y ** 2);
-		return 0.5 * speed ** 2 * coef
-	}
-
-	getApproximatedWaveResistance = () => {
-
-		const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.y ** 2);
-
-		const force = (speed ** 5 / this.hullSpeed ** 5 + Math.pow(3, speed - this.hullSpeed))
-		return force
-	}
 }
 
