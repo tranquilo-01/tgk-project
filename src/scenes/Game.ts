@@ -53,15 +53,17 @@ export class Game extends Scene {
             Wave Resistance: ${this.boat.getApproximatedWaveResistance()}
             Total Resistance: ${this.boat.getFrictionResistance() + this.boat.getApproximatedWaveResistance()}
             Drift Speed: ${this.boat.getDriftSpeed()}
-            LiftVectorHeading: ${utils.vectorHeading(this.boat.getLiftUnitVector())}`);
+            Andle of Attack: ${this.boat.getAngleOfAttack()}
+            LiftVector: ${this.boat.getLiftForce().x}, ${this.boat.getLiftForce().y}
+            DragVector: ${this.boat.getDragForce().x}, ${this.boat.getDragForce().y}`);
         });
     }
 
     update() {
         this.boat.updateWindData(this.TWS, this.GWD)
-        this.moveWithWSAD(this.boat.body)
+        this.moveWithWSAD()
         this.boat.applyFrictionForces()
-        this.boat.applyTestSailForce()
+        this.boat.applySailForces()
         // this.camera.setScroll(this.boat.getPosition().x - this.scale.height / 2, this.boat.getPosition().y - this.scale.width / 2)
         this.camera.centerOn(this.boat.getPosition().x, this.boat.getPosition().y);
     }
@@ -74,23 +76,23 @@ export class Game extends Scene {
         this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D)
     }
 
-    moveWithWSAD(object: MatterJS.BodyType) {
+    moveWithWSAD() {
         const wKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W);
         const sKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S);
         const aKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         const dKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
 
-        const rotation = object.angle;
+        // const rotation = object.angle;
 
-        const forceMagnitude = 5; // Adjust the force magnitude as needed
-        const forceX = Math.sin(rotation) * forceMagnitude;
-        const forceY = -Math.cos(rotation) * forceMagnitude;
+        // const forceMagnitude = 5; // Adjust the force magnitude as needed
+        // const forceX = Math.sin(rotation) * forceMagnitude;
+        // const forceY = -Math.cos(rotation) * forceMagnitude;
 
         if (wKey.isDown) {
-            this.boat.applyForce({ x: forceX, y: forceY });
+            this.boat.takeSail(0.08);
         }
         if (sKey.isDown) {
-            this.boat.applyForce({ x: -forceX, y: -forceY });
+            this.boat.giveSail(0.08);
         }
         if (aKey.isDown) {
             this.boat.applyTorque(-0.0003);

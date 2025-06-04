@@ -70,6 +70,13 @@ export class Boat {
 		this.applyForce(liftForce);
 	}
 
+	applySailForces() {
+		const liftForce = this.getLiftForce();
+		// const dragForce = this.getDragForce();
+		this.applyForce(liftForce);
+		// this.applyForce(dragForce);
+	}
+
 	// --------------------forces---------------------
 	getAntiDriftForce(): MatterJS.Vector {
 		const driftVector = this.getDriftVector();
@@ -118,15 +125,15 @@ export class Boat {
 	}
 
 	// --------------------sails---------------------
-	takeSail() {
+	takeSail(angle: number) {
 		if (this.trimmedSailAngle > this.lowerSailTrimLimit) {
-			this.trimmedSailAngle -= 0.5;
+			this.trimmedSailAngle -= angle;
 		}
 	}
 
-	giveSail() {
+	giveSail(angle: number) {
 		if (this.trimmedSailAngle < this.upperSailTrimLimit) {
-			this.trimmedSailAngle += 0.5;
+			this.trimmedSailAngle += angle;
 		}
 	}
 
@@ -138,19 +145,6 @@ export class Boat {
 		}
 	}
 
-	getLiftUnitVector(): MatterJS.Vector {
-		const heading = this.getHeading();
-		let liftDirection = 0
-		if (this.getTack() === "starboard") {
-			liftDirection = (heading - 90 + this.trimmedSailAngle) % 360;
-		} else {
-			liftDirection = (heading + 90 - this.trimmedSailAngle) % 360;
-		}
-		const liftRadians = utils.degreesToRadians(liftDirection - 90);
-		const liftX = Math.cos(liftRadians);
-		const liftY = Math.sin(liftRadians);
-		return { x: liftX, y: liftY };
-	}
 
 	getTack(): string {
 		const awa = this.getAWA();
@@ -159,6 +153,80 @@ export class Boat {
 		} else {
 			return "port";
 		}
+	}
+
+	getAngleOfAttack(): number {
+		const awa = this.getAWA();
+		const sailAngle = this.getSailAngle(awa);
+		const angleOfAttack = (awa % 180) - Math.abs(sailAngle);
+		return angleOfAttack;
+	}
+
+	getLiftUnitVector(): MatterJS.Vector {
+		let liftDirection = 0
+		if (this.getTack() === "starboard") {
+			liftDirection = (this.getAWA() + 270) % 360;
+		} else {
+			liftDirection = (this.getAWA() + 90) % 360;
+		}
+		const liftRadians = utils.degreesToRadians(liftDirection - 90);
+		const liftX = Math.cos(liftRadians);
+		const liftY = Math.sin(liftRadians);
+		return { x: liftX, y: liftY };
+	}
+
+	liftCoefficient(): number {
+		const angleOfAttack = this.getAngleOfAttack();
+		if (angleOfAttack > 11 && angleOfAttack <= 32) {
+			return -(1 / 300) * (angleOfAttack - 32) ** 2 + 1.5
+		} else if (angleOfAttack > 32 && angleOfAttack <= 90) {
+			return -(1.3 / 3364) * (angleOfAttack - 32) ** 2 + 1.5
+		} else {
+			return 0
+		}
+	}
+
+	getLiftForce(): MatterJS.Vector {
+		const coeff = 1;
+		const magnitude = coeff * (this.getAWS() - 20) ** 2 * this.liftCoefficient();
+		const liftUnitVector = this.getLiftUnitVector();
+
+		const liftForceX = liftUnitVector.x * magnitude;
+		const liftForceY = liftUnitVector.y * magnitude;
+		const liftForce: MatterJS.Vector = { x: liftForceX, y: liftForceY };
+		return liftForce;
+	}
+
+	dragCoefficient(): number {
+		const angleOfAttack = this.getAngleOfAttack();
+		if (angleOfAttack > 0 && angleOfAttack <= 11) {
+			return 0.11
+		} else if (angleOfAttack > 11 && angleOfAttack <= 90) {
+			return -(1.35 / 6400) * (angleOfAttack - 10) ** 2 + 0.15
+		} else if (angleOfAttack > 90 && angleOfAttack <= 170) {
+			return -(1.35 / 6400) * (angleOfAttack - 170) ** 2 + 1.5
+		} else {
+			return 0
+		}
+	}
+
+	dragUnitVector(): MatterJS.Vector {
+		const dragDirection = (this.getAWA() + 180) % 360;
+		const dragRadians = utils.degreesToRadians(dragDirection - 90);
+		const dragX = Math.cos(dragRadians);
+		const dragY = Math.sin(dragRadians);
+		return { x: dragX, y: dragY };
+	}
+
+	getDragForce(): MatterJS.Vector {
+		const coeff = 1;
+		const magnitude = coeff * (this.getAWS() - 20) ** 2 * this.dragCoefficient();
+		const dragUnitVector = this.dragUnitVector();
+
+		const dragForceX = dragUnitVector.x * magnitude;
+		const dragForceY = dragUnitVector.y * magnitude;
+		const dragForce: MatterJS.Vector = { x: dragForceX, y: dragForceY };
+		return dragForce;
 	}
 
 	// --------------------plotter data--------------------
