@@ -12,8 +12,9 @@ export class Game extends Scene {
     sailRect: Phaser.GameObjects.Rectangle;
     headingLine: Phaser.GameObjects.Line;
     cogLine: Phaser.GameObjects.Line;
+    windParticles: Phaser.GameObjects.Graphics[] = [];
 
-    GWD: number = 170
+    GWD: number = 180 // FIXME: something with the angles
     TWS: number = 15
 
 
@@ -87,6 +88,22 @@ export class Game extends Scene {
         cogLine.setDepth(2);
         this.cogLine = cogLine;
 
+        // // Wind visualization particles
+        const windParticleCount = 120;
+        this.windParticles = [];
+        for (let i = 0; i < windParticleCount; i++) {
+            const x = Math.random() * 3000;
+            const y = Math.random() * 6000;
+            const g = this.add.graphics();
+            g.fillStyle(0xffffff, 0.85); // white, more visible
+            g.fillEllipse(0, 0, 4, 4); // slightly larger for visibility
+            g.alpha = 0.85 + Math.random() * 0.15;
+            g.x = x;
+            g.y = y;
+            g.setDepth(1);
+            this.windParticles.push(g);
+        }
+
         this.registerWSAD();
 
         const style = { font: '16px Arial', fill: '#ffffff' };
@@ -152,6 +169,18 @@ export class Game extends Scene {
             WaterDragVector: ${this.boat.getWaterDragVector().x.toFixed(2)}, ${this.boat.getWaterDragVector().y.toFixed(2)}
             AntiDriftVector: ${this.boat.getAntiDriftForce().x.toFixed(2)}, ${this.boat.getAntiDriftForce().y.toFixed(2)}`);
 
+            // Wind particles update
+            const windRad = Phaser.Math.DegToRad(this.GWD + 180);
+            const windSpeed = this.TWS; // visual speed factor
+            for (const p of this.windParticles) {
+                p.x += Math.sin(windRad) * windSpeed * 0.2; // FIXME: something with the angles
+                p.y += Math.cos(windRad) * windSpeed * 0.2; // FIXME: something with the angles
+                // Wrap around world bounds
+                if (p.x < 0) p.x += 3000;
+                if (p.x > 3000) p.x -= 3000;
+                if (p.y < 0) p.y += 6000;
+                if (p.y > 6000) p.y -= 6000;
+            }
         });
     }
 
