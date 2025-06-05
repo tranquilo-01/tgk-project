@@ -9,8 +9,11 @@ export class Game extends Scene {
     boat: Boat
     rect: MatterJS.BodyType
     islands: (Phaser.GameObjects.Ellipse | Phaser.GameObjects.Rectangle)[] = [];
+    sailRect: Phaser.GameObjects.Rectangle;
+    headingLine: Phaser.GameObjects.Line;
+    cogLine: Phaser.GameObjects.Line;
 
-    GWD: number = 180
+    GWD: number = 170
     TWS: number = 15
 
 
@@ -68,6 +71,22 @@ export class Game extends Scene {
         this.boat = new Boat(this, 1500, 5900, 20, 30, 12000, 4.5);
         this.boat.updateWindData(this.TWS, this.GWD);
 
+        // Mainsail visualisation rectangle
+        const sailLength = 50;
+        const sailWidth = 6;
+        const sailRect = this.add.rectangle(0, 0, sailWidth, sailLength, 0xffffff).setOrigin(0.5, 1);
+        sailRect.setDepth(1);
+        this.sailRect = sailRect;
+
+        // Heading and COG lines
+        const lineLength = 400;
+        const headingLine = this.add.line(0, 0, 0, 0, 0, -lineLength, 0xff0000).setOrigin(0.5, 0).setLineWidth(1);
+        headingLine.setDepth(2);
+        this.headingLine = headingLine;
+        const cogLine = this.add.line(0, 0, 0, 0, 0, -lineLength, 0x001a4d).setOrigin(0.5, 0).setLineWidth(1);
+        cogLine.setDepth(2);
+        this.cogLine = cogLine;
+
         this.registerWSAD();
 
         const style = { font: '16px Arial', fill: '#ffffff' };
@@ -92,6 +111,21 @@ export class Game extends Scene {
         };
 
         this.events.on('update', () => {
+            // Update sail visualisation
+            const boatPos = this.boat.sprite;
+            const sailAngle = this.boat.getSailAngle(this.boat.getAWA());
+            this.sailRect.x = boatPos.x;
+            this.sailRect.y = boatPos.y;
+            this.sailRect.rotation = boatPos.rotation + Phaser.Math.DegToRad(sailAngle + 180);
+
+            // Update heading and COG lines
+            this.headingLine.x = boatPos.x;
+            this.headingLine.y = boatPos.y;
+            this.headingLine.rotation = boatPos.rotation;
+            this.cogLine.x = boatPos.x;
+            this.cogLine.y = boatPos.y;
+            this.cogLine.rotation = Phaser.Math.DegToRad(this.boat.getCOG());
+
             const heading = this.boat.getHeading();
             const cog = this.boat.getCOG();
             const sog = this.boat.getSOG();
