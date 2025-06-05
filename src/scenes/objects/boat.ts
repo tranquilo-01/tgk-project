@@ -4,6 +4,7 @@ import * as utils from '../utils/utils';
 
 
 export class Boat {
+	sprite: Phaser.Physics.Matter.Sprite;
 	body: MatterJS.BodyType;
 	wettedArea: number;
 	length: number;
@@ -14,12 +15,15 @@ export class Boat {
 	hullSpeed: number;
 	windData: { TWS: number, GWD: number };
 
-	constructor(body: MatterJS.BodyType, wettedArea: number, length: number, mass: number, hullSpeed: number) {
-		this.body = body;
+	constructor(scene: Phaser.Scene, x: number, y: number, wettedArea: number, length: number, mass: number, hullSpeed: number) {
+		this.sprite = scene.matter.add.sprite(x, y, 'boat');
+		this.body = this.sprite.body as MatterJS.BodyType;
+		this.sprite.setScale(0.15); // Scale 20x smaller
 		this.wettedArea = wettedArea;
 		this.length = length;
 		this.body.frictionAir = 0;
 		this.body.mass = mass;
+		this.body.inverseMass = 1 / mass;
 		this.body.restitution = 0;
 		this.trimmedSailAngle = 45;
 		this.lowerSailTrimLimit = 15;
@@ -61,7 +65,7 @@ export class Boat {
 
 	applyAntiRotationTorque() {
 		const sign = - Math.sign(this.body.angularVelocity);
-		this.body.torque += sign * 0.0002;
+		this.body.torque += sign * 0.002;
 	}
 
 	applyTestSailForce() {
