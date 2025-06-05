@@ -34,16 +34,20 @@ export class Boat {
 
 	// ----------------------apply forces-----------------
 	applyFrictionForces() {
-		const hullDragForce = this.getFrictionResistance();
-		const waveDragForce = this.getApproximatedWaveResistance();
-		const totalDragForce = hullDragForce + waveDragForce;
-		const dragAngle = Math.atan2(this.body.velocity.y, this.body.velocity.x);
-		const dragVector: MatterJS.Vector = { x: -totalDragForce * Math.cos(dragAngle), y: -totalDragForce * Math.sin(dragAngle) }
+		const dragVector = this.getWaterDragVector();
 		this.applyForce(dragVector);
 
 		const getAntiDriftForce = this.getAntiDriftForce();
 		this.applyForce(getAntiDriftForce);
 		this.applyAntiRotationTorque();
+	}
+
+	getWaterDragVector(): MatterJS.Vector {
+		const hullDragForce = this.getFrictionResistance();
+		const waveDragForce = this.getApproximatedWaveResistance();
+		const totalDragForce = hullDragForce + waveDragForce;
+		const dragAngle = Math.atan2(this.body.velocity.y, this.body.velocity.x);
+		return { x: -totalDragForce * Math.cos(dragAngle), y: -totalDragForce * Math.sin(dragAngle) }
 	}
 
 	applyForce(force: MatterJS.Vector) {
@@ -72,9 +76,9 @@ export class Boat {
 
 	applySailForces() {
 		const liftForce = this.getLiftForce();
-		// const dragForce = this.getDragForce();
 		this.applyForce(liftForce);
-		// this.applyForce(dragForce);
+		const dragForce = this.getDragForce();
+		this.applyForce(dragForce);
 	}
 
 	// --------------------forces---------------------
@@ -156,23 +160,37 @@ export class Boat {
 	}
 
 	getAngleOfAttack(): number {
-		const awa = this.getAWA();
-		const sailAngle = this.getSailAngle(awa);
-		const angleOfAttack = (awa % 180) - Math.abs(sailAngle);
+		const awa = this.getAWA(); // 0-360 relative to bow
+		// sailAngle is angle of sail relative to boat centerline (+ starboard, - port)
+		const sailAngleSigned = this.getSailAngle(awa);
+
+		// Convert AWA to +/- 180 range (e.g. 315 AWA -> -45 deg)
+		let awaSymmetric = awa > 180 ? awa - 360 : awa;
+
+		// AoA is the absolute difference
+		const angleOfAttack = Math.abs(awaSymmetric - sailAngleSigned);
 		return angleOfAttack;
 	}
 
 	getLiftUnitVector(): MatterJS.Vector {
-		let liftDirection = 0
-		if (this.getTack() === "starboard") {
-			liftDirection = (this.getAWA() + 270) % 360;
-		} else {
-			liftDirection = (this.getAWA() + 90) % 360;
+		const apparentWindVec = this.getApparentWindGlobalVector();
+		const aws = Math.sqrt(apparentWindVec.x ** 2 + apparentWindVec.y ** 2);
+
+		if (aws < 0.001) {
+			return { x: 0, y: 0 };
 		}
-		const liftRadians = utils.degreesToRadians(liftDirection - 90);
-		const liftX = Math.cos(liftRadians);
-		const liftY = Math.sin(liftRadians);
-		return { x: liftX, y: liftY };
+		const unitAwX = apparentWindVec.x / aws;
+		const unitAwY = apparentWindVec.y / aws;
+
+		// getTack() determines if wind is from starboard (>0 to 179 AWA) or port side.
+		// AWA calculation uses global AW vector and global boat heading, so it's correct.
+		if (this.getTack() === "starboard") {
+			// Lift is 90 degrees CCW (left) from the global Apparent Wind vector
+			return { x: -unitAwY, y: unitAwX };
+		} else { // Port tack
+			// Lift is 90 degrees CW (right) from the global Apparent Wind vector
+			return { x: unitAwY, y: -unitAwX };
+		}
 	}
 
 	liftCoefficient(): number {
@@ -187,8 +205,8 @@ export class Boat {
 	}
 
 	getLiftForce(): MatterJS.Vector {
-		const coeff = 1;
-		const magnitude = coeff * (this.getAWS() - 20) ** 2 * this.liftCoefficient();
+		const coeff = 0.01;
+		const magnitude = coeff * (this.getAWS()) ** 2 * this.liftCoefficient();
 		const liftUnitVector = this.getLiftUnitVector();
 
 		const liftForceX = liftUnitVector.x * magnitude;
@@ -211,16 +229,19 @@ export class Boat {
 	}
 
 	dragUnitVector(): MatterJS.Vector {
-		const dragDirection = (this.getAWA() + 180) % 360;
-		const dragRadians = utils.degreesToRadians(dragDirection - 90);
-		const dragX = Math.cos(dragRadians);
-		const dragY = Math.sin(dragRadians);
-		return { x: dragX, y: dragY };
+		const apparentWindVec = this.getApparentWindGlobalVector();
+		const aws = Math.sqrt(apparentWindVec.x ** 2 + apparentWindVec.y ** 2);
+
+		if (aws < 0.001) { // Avoid division by zero for very low speeds
+			return { x: 0, y: 0 };
+		}
+		// Drag force is in the direction of the global apparent wind
+		return { x: apparentWindVec.x / aws, y: apparentWindVec.y / aws };
 	}
 
 	getDragForce(): MatterJS.Vector {
-		const coeff = 1;
-		const magnitude = coeff * (this.getAWS() - 20) ** 2 * this.dragCoefficient();
+		const coeff = 0.01;
+		const magnitude = coeff * (this.getAWS()) ** 2 * this.dragCoefficient();
 		const dragUnitVector = this.dragUnitVector();
 
 		const dragForceX = dragUnitVector.x * magnitude;
@@ -289,11 +310,42 @@ export class Boat {
 		return parseFloat(Math.sqrt(apparentWindVector.x ** 2 + apparentWindVector.y ** 2).toFixed(1))
 	}
 
+	private getApparentWindGlobalVector(): MatterJS.Vector {
+		const trueWind_TWS = this.windData.TWS;
+		const trueWind_GWD = this.windData.GWD; // Your TWD input
+
+		// This is your existing calculation, confirmed to be correct for your setup
+		const windRad = ((trueWind_GWD - 180) * Math.PI) / 180;
+		const trueWindGlobalVector = {
+			x: Math.sin(windRad) * trueWind_TWS,
+			y: Math.cos(windRad) * trueWind_TWS
+		};
+
+		// Apparent Wind = True Wind (global) - Boat Velocity (global)
+		// this.body.velocity is already in global Matter.js coordinates.
+		return {
+			x: trueWindGlobalVector.x - this.body.velocity.x,
+			y: trueWindGlobalVector.y - this.body.velocity.y
+		};
+	}
+
 	getAWA = () => {
 		const windRadians = ((this.windData.GWD - 180) * Math.PI) / 180;
 		const windVector: MatterJS.Vector = { x: Math.sin(windRadians) * this.windData.TWS, y: Math.cos(windRadians) * this.windData.TWS }
 		const apparentWindVector: MatterJS.Vector = { x: - this.body.velocity.x + windVector.x, y: - this.body.velocity.y + windVector.y }
 		return (540 + utils.vectorHeading(apparentWindVector) - this.getHeading()) % 360 // where wind comes from not where it goes
+	}
+
+	private getGlobalTrueWindVector(): MatterJS.Vector {
+		if (!this.windData) return { x: 0, y: 0 };
+		// Convert GWD (0=N, 90=E, meteorological) to math angle (0=E, 90=N, vector direction)
+		// Math angle = (450 - GWD) % 360 or ( (90 - GWD) + 360 ) % 360
+		const mathAngleDeg = (450 - this.windData.GWD) % 360;
+		const windRadians = utils.degreesToRadians(mathAngleDeg);
+
+		const windX = Math.cos(windRadians) * this.windData.TWS;
+		const windY = Math.sin(windRadians) * this.windData.TWS;
+		return { x: windX, y: windY };
 	}
 
 

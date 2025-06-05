@@ -49,13 +49,13 @@ export class Game extends Scene {
             AWS: ${AWS} AWA: ${AWA}
             Tack: ${this.boat.getTack()}
             Sail Angle: ${this.boat.getSailAngle(AWA)}
-            Friction Resistance: ${this.boat.getFrictionResistance()}
-            Wave Resistance: ${this.boat.getApproximatedWaveResistance()}
-            Total Resistance: ${this.boat.getFrictionResistance() + this.boat.getApproximatedWaveResistance()}
-            Drift Speed: ${this.boat.getDriftSpeed()}
             Andle of Attack: ${this.boat.getAngleOfAttack()}
-            LiftVector: ${this.boat.getLiftForce().x}, ${this.boat.getLiftForce().y}
-            DragVector: ${this.boat.getDragForce().x}, ${this.boat.getDragForce().y}`);
+            ApparentWind: ${AWS.toFixed(2)}, ${AWA.toFixed(2)}
+            SailLiftVector: ${this.boat.getLiftForce().x.toFixed(2)}, ${this.boat.getLiftForce().y.toFixed(2)}
+            SailDragVector: ${this.boat.getDragForce().x.toFixed(2)}, ${this.boat.getDragForce().y.toFixed(2)}
+            WaterDragVector: ${this.boat.getWaterDragVector().x.toFixed(2)}, ${this.boat.getWaterDragVector().y.toFixed(2)}
+            AntiDriftVector: ${this.boat.getAntiDriftForce().x.toFixed(2)}, ${this.boat.getAntiDriftForce().y.toFixed(2)}`);
+
         });
     }
 
