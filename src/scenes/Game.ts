@@ -14,8 +14,9 @@ export class Game extends Scene {
     headingLine: Phaser.GameObjects.Line;
     cogLine: Phaser.GameObjects.Line;
     windParticles: Phaser.GameObjects.Graphics[] = [];
-
     windVector: { x: number, y: number } = { x: -15, y: 0 };
+    debugOverlay: Phaser.GameObjects.Text | null = null; // Debug overlay text
+    isDebugOverlay: boolean = true; // Flag to toggle debug overlay
 
     constructor() {
         super('Game');
@@ -105,8 +106,12 @@ export class Game extends Scene {
 
         this.registerWSAD();
 
-        const style = { font: '16px Arial', fill: '#ffffff' };
-        const overlay = this.add.text(10, 10, '', style).setScrollFactor(0);
+        // Initialize debug overlay
+        if (this.isDebugOverlay) {
+            const style = { font: '16px Arial', fill: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', padding: { x: 0, y: 0 } };
+            this.debugOverlay = this.add.text(10, 10, '', style).setScrollFactor(0).setDepth(10);
+        }
+
 
         // Collision with islands or world bounds ends game
         this.matter.world.on('collisionstart', (event: any) => {
@@ -127,59 +132,16 @@ export class Game extends Scene {
         };
 
         this.events.on('update', () => {
-            // Update sail visualisation
-            const boatPos = this.boat.sprite;
-            const sailAngle = this.boat.sailAngle();
-            this.sailRect.x = boatPos.x;
-            this.sailRect.y = boatPos.y;
-            this.sailRect.rotation = boatPos.rotation + Phaser.Math.DegToRad(sailAngle + 180);
 
-            // Update heading and COG lines
-            this.headingLine.x = boatPos.x;
-            this.headingLine.y = boatPos.y;
-            this.headingLine.rotation = boatPos.rotation;
-            this.cogLine.x = boatPos.x;
-            this.cogLine.y = boatPos.y;
-            this.cogLine.rotation = Phaser.Math.DegToRad(this.boat.getCOG());
+            this.updateSailVisualisation();
+            this.updateCourseLines();
+            this.updateWindParticles();
 
-            const heading = this.boat.getHeading();
-            const cog = this.boat.getCOG();
-            const sog = this.boat.getSOG();
-            const position = this.boat.getPosition();
-            const AWS = this.boat.getAWS()
-            const AWA = this.boat.getAWA()
-
-
-            overlay.setText(`
-            Heading: ${heading} 
-            COG: ${cog}
-            SOG: ${sog}
-            Position: ${Math.floor(position.x)}, ${Math.floor(position.y)}
-            Wind Vector: ${this.windVector.x.toFixed(2)}, ${this.windVector.y.toFixed(2)}
-            TWS: ${vectorLength(this.windVector)} GWD: ${(vectorGeographicAngle(this.windVector) + 180) % 360}
-            AWS: ${AWS} AWA: ${AWA}
-            Tack: ${this.boat.getTack()}
-            Trimmed sail angle: ${this.boat.trimmedSailAngle.toFixed(2)}
-            Sail Angle: ${this.boat.sailAngle()}
-            Andle of Attack: ${this.boat.getAngleOfAttack()}
-            Lift coefficient: ${this.boat.liftCoefficient().toFixed(2)}
-            Lift unit vector: ${this.boat.liftUnitVector().x.toFixed(2)}, ${this.boat.liftUnitVector().y.toFixed(2)}
-            SailLiftVector: ${this.boat.liftForce().x.toFixed(2)}, ${this.boat.liftForce().y.toFixed(2)}
-            Drag unit vector: ${this.boat.dragUnitVector().x.toFixed(2)}, ${this.boat.dragUnitVector().y.toFixed(2)}
-            Drag coefficient: ${this.boat.sailDragCoefficient().toFixed(2)}
-            SailDragVector: ${this.boat.sailDragForce().x.toFixed(2)}, ${this.boat.sailDragForce().y.toFixed(2)}
-            WaterDragVector: ${this.boat.waterDragVector().x.toFixed(2)}, ${this.boat.waterDragVector().y.toFixed(2)}
-            AntiDriftVector: ${this.boat.getAntiDriftForce().x.toFixed(2)}, ${this.boat.getAntiDriftForce().y.toFixed(2)}`);
-
-            // Wind particles update
-            for (const p of this.windParticles) {
-                p.x += this.windVector.x * 0.2;
-                p.y += this.windVector.y * 0.2;
-                // Wrap around world bounds
-                if (p.x < 0) p.x += 3000;
-                if (p.x > 3000) p.x -= 3000;
-                if (p.y < 0) p.y += 6000;
-                if (p.y > 6000) p.y -= 6000;
+            if (this.debugOverlay) {
+                this.debugOverlay.setVisible(this.isDebugOverlay);
+            }
+            if (this.isDebugOverlay && this.debugOverlay) { // Ensure overlay exists before updating
+                this.displayDebugOverlay();
             }
         });
     }
@@ -207,12 +169,6 @@ export class Game extends Scene {
         const aKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         const dKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
 
-        // const rotation = object.angle;
-
-        // const forceMagnitude = 5; // Adjust the force magnitude as needed
-        // const forceX = Math.sin(rotation) * forceMagnitude;
-        // const forceY = -Math.cos(rotation) * forceMagnitude;
-
         if (wKey.isDown) {
             this.boat.takeSail(0.12);
         }
@@ -225,5 +181,61 @@ export class Game extends Scene {
         if (dKey.isDown) {
             this.boat.applyTorque(0.005);
         }
+    }
+
+    updateCourseLines() {
+        // Update heading and COG lines
+        const boatPos = this.boat.sprite;
+        this.headingLine.x = boatPos.x;
+        this.headingLine.y = boatPos.y;
+        this.headingLine.rotation = boatPos.rotation;
+        this.cogLine.x = boatPos.x;
+        this.cogLine.y = boatPos.y;
+        this.cogLine.rotation = Phaser.Math.DegToRad(this.boat.getCOG());
+    }
+
+    updateSailVisualisation() {
+        // Update sail visualisation
+        const boatPos = this.boat.sprite;
+        const sailAngle = this.boat.sailAngle();
+        this.sailRect.x = boatPos.x;
+        this.sailRect.y = boatPos.y;
+        this.sailRect.rotation = boatPos.rotation + Phaser.Math.DegToRad(sailAngle + 180);
+    }
+
+    updateWindParticles() {
+        // Update wind particles
+        for (const p of this.windParticles) {
+            p.x += this.windVector.x * 0.5;
+            p.y += this.windVector.y * 0.5;
+            // Wrap around world bounds
+            if (p.x < 0) p.x += 3000;
+            if (p.x > 3000) p.x -= 3000;
+            if (p.y < 0) p.y += 6000;
+            if (p.y > 6000) p.y -= 6000;
+        }
+    }
+
+    displayDebugOverlay() {
+        this.debugOverlay!.setText(`
+        Heading: ${this.boat.getHeading()} 
+        COG: ${this.boat.getCOG()}
+        SOG: ${this.boat.getSOG().toFixed(2)}
+        Position: ${Math.floor(this.boat.body.position.x)}, ${Math.floor(this.boat.body.position.y)}
+        Wind Vector: ${this.windVector.x.toFixed(2)}, ${this.windVector.y.toFixed(2)}
+        TWS: ${vectorLength(this.windVector)} GWD: ${(vectorGeographicAngle(this.windVector) + 180) % 360}
+        AWS: ${this.boat.getAWS()} AWA: ${this.boat.getAWA()}
+        Tack: ${this.boat.getTack()}
+        Trimmed sail angle: ${this.boat.trimmedSailAngle.toFixed(2)}
+        Sail Angle: ${this.boat.sailAngle().toFixed(0)}
+        Angle of Attack: ${this.boat.getAngleOfAttack().toFixed(0)}
+        Lift coefficient: ${this.boat.liftCoefficient().toFixed(2)}
+        Lift unit vector: ${this.boat.liftUnitVector().x.toFixed(2)}, ${this.boat.liftUnitVector().y.toFixed(2)}
+        SailLiftVector: ${this.boat.liftForce().x.toFixed(2)}, ${this.boat.liftForce().y.toFixed(2)}
+        Drag unit vector: ${this.boat.dragUnitVector().x.toFixed(2)}, ${this.boat.dragUnitVector().y.toFixed(2)}
+        Drag coefficient: ${this.boat.sailDragCoefficient().toFixed(2)}
+        SailDragVector: ${this.boat.sailDragForce().x.toFixed(2)}, ${this.boat.sailDragForce().y.toFixed(2)}
+        WaterDragVector: ${this.boat.waterDragVector().x.toFixed(2)}, ${this.boat.waterDragVector().y.toFixed(2)}
+        AntiDriftVector: ${this.boat.getAntiDriftForce().x.toFixed(2)}, ${this.boat.getAntiDriftForce().y.toFixed(2)}`);
     }
 }
