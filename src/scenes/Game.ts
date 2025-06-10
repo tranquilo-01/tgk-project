@@ -130,20 +130,6 @@ export class Game extends Scene {
                 this.scene.start('GameOver');
             }
         };
-
-        this.events.on('update', () => {
-
-            this.updateSailVisualisation();
-            this.updateCourseLines();
-            this.updateWindParticles();
-
-            if (this.debugOverlay) {
-                this.debugOverlay.setVisible(this.isDebugOverlay);
-            }
-            if (this.isDebugOverlay && this.debugOverlay) { // Ensure overlay exists before updating
-                this.displayDebugOverlay();
-            }
-        });
     }
 
     update() {
@@ -151,8 +137,17 @@ export class Game extends Scene {
         this.moveWithWSAD()
         this.boat.applyFrictionForces()
         this.boat.applySailForces()
-        // this.camera.setScroll(this.boat.getPosition().x - this.scale.height / 2, this.boat.getPosition().y - this.scale.width / 2)
         this.camera.centerOn(this.boat.getPosition().x, this.boat.getPosition().y - 250);
+        this.updateSailVisualisation();
+        this.updateCourseLines();
+        this.updateWindParticles();
+
+        if (this.debugOverlay) {
+            this.debugOverlay.setVisible(this.isDebugOverlay);
+        }
+        if (this.isDebugOverlay && this.debugOverlay) { // Ensure overlay exists before updating
+            this.displayDebugOverlay();
+        }
     }
 
     registerWSAD() {
