@@ -13,7 +13,7 @@ export class Boat {
 	lowerSailTrimLimit: number;
 	upperSailTrimLimit: number;
 	hullSpeed: number;
-	windData: { TWS: number, GWD: number };
+	windVector: MatterJS.Vector = { x: 0, y: 0 };
 
 	constructor(scene: Phaser.Scene, x: number, y: number, wettedArea: number, length: number, mass: number, hullSpeed: number) {
 		this.sprite = scene.matter.add.sprite(x, y, 'boat');
@@ -32,13 +32,13 @@ export class Boat {
 	}
 
 	// --------------------environment data-----------------
-	updateWindData(TWS: number, GWD: number) {
-		this.windData = { TWS, GWD };
+	updateWindVector(wind: MatterJS.Vector) {
+		this.windVector = wind;
 	}
 
 	// ----------------------apply forces-----------------
 	applyFrictionForces() {
-		const dragVector = this.getWaterDragVector();
+		const dragVector = this.waterDragVector();
 		this.applyForce(dragVector);
 
 		const getAntiDriftForce = this.getAntiDriftForce();
@@ -46,9 +46,9 @@ export class Boat {
 		this.applyAntiRotationTorque();
 	}
 
-	getWaterDragVector(): MatterJS.Vector {
-		const hullDragForce = this.getFrictionResistance();
-		const waveDragForce = this.getApproximatedWaveResistance();
+	waterDragVector(): MatterJS.Vector {
+		const hullDragForce = this.waterFrictionResistance();
+		const waveDragForce = this.waveResistance();
 		const totalDragForce = hullDragForce + waveDragForce;
 		const dragAngle = Math.atan2(this.body.velocity.y, this.body.velocity.x);
 		return { x: -totalDragForce * Math.cos(dragAngle), y: -totalDragForce * Math.sin(dragAngle) }
@@ -68,20 +68,10 @@ export class Boat {
 		this.body.torque += sign * 0.002;
 	}
 
-	applyTestSailForce() {
-		const liftUnitVector = this.getLiftUnitVector();
-		const liftForceMagnitude = 3;
-
-		const liftForceX = liftUnitVector.x * liftForceMagnitude;
-		const liftForceY = liftUnitVector.y * liftForceMagnitude;
-		const liftForce: MatterJS.Vector = { x: liftForceX, y: liftForceY };
-		this.applyForce(liftForce);
-	}
-
 	applySailForces() {
-		const liftForce = this.getLiftForce();
+		const liftForce = this.liftForce();
 		this.applyForce(liftForce);
-		const dragForce = this.getDragForce();
+		const dragForce = this.sailDragForce();
 		this.applyForce(dragForce);
 	}
 
@@ -109,7 +99,7 @@ export class Boat {
 		return { x: forceX, y: forceY };
 	}
 
-	getFrictionResistance = () => {
+	waterFrictionResistance = () => {
 		const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.y ** 2);
 		const dragCoefficient = 0.0001;
 		const area = 20; // wetted area in m^2
@@ -124,8 +114,7 @@ export class Boat {
 		return 0.5 * speed ** 2 * coef
 	}
 
-	getApproximatedWaveResistance = () => {
-
+	waveResistance = () => {
 		const speed = Math.sqrt(this.body.velocity.x ** 2 + this.body.velocity.y ** 2);
 
 		const force = (speed ** 5 / this.hullSpeed ** 5 + Math.pow(3, speed - this.hullSpeed))
@@ -177,7 +166,7 @@ export class Boat {
 	}
 
 	getLiftUnitVector(): MatterJS.Vector {
-		const apparentWindVec = this.getApparentWindGlobalVector();
+		const apparentWindVec = this.apparentWindVector();
 		const aws = Math.sqrt(apparentWindVec.x ** 2 + apparentWindVec.y ** 2);
 
 		if (aws < 0.001) {
@@ -208,7 +197,7 @@ export class Boat {
 		}
 	}
 
-	getLiftForce(): MatterJS.Vector {
+	liftForce(): MatterJS.Vector {
 		const coeff = 0.01;
 		const magnitude = coeff * (this.getAWS()) ** 2 * this.liftCoefficient();
 		const liftUnitVector = this.getLiftUnitVector();
@@ -233,7 +222,7 @@ export class Boat {
 	}
 
 	dragUnitVector(): MatterJS.Vector {
-		const apparentWindVec = this.getApparentWindGlobalVector();
+		const apparentWindVec = this.apparentWindVector();
 		const aws = Math.sqrt(apparentWindVec.x ** 2 + apparentWindVec.y ** 2);
 
 		if (aws < 0.001) { // Avoid division by zero for very low speeds
@@ -243,7 +232,7 @@ export class Boat {
 		return { x: apparentWindVec.x / aws, y: apparentWindVec.y / aws };
 	}
 
-	getDragForce(): MatterJS.Vector {
+	sailDragForce(): MatterJS.Vector {
 		const coeff = 0.01;
 		const magnitude = coeff * (this.getAWS()) ** 2 * this.dragCoefficient();
 		const dragUnitVector = this.dragUnitVector();
@@ -251,7 +240,8 @@ export class Boat {
 		const dragForceX = dragUnitVector.x * magnitude;
 		const dragForceY = dragUnitVector.y * magnitude;
 		const dragForce: MatterJS.Vector = { x: dragForceX, y: dragForceY };
-		return dragForce;
+		// return dragForce;
+		return { x: 0, y: 0 };
 	}
 
 	// --------------------plotter data--------------------
@@ -266,7 +256,7 @@ export class Boat {
 		if (this.isStationary()) {
 			return this.getHeading()
 		}
-		return utils.vectorHeading(this.body.velocity)
+		return utils.vectorGeographicAngle(this.body.velocity)
 	}
 
 	isStationary(): boolean {
@@ -308,48 +298,36 @@ export class Boat {
 
 
 	getAWS(): number {
-		const windRadians = ((this.windData.GWD - 180) * Math.PI) / 180;
-		const windVector: MatterJS.Vector = { x: Math.sin(windRadians) * this.windData.TWS, y: Math.cos(windRadians) * this.windData.TWS }
-		const apparentWindVector: MatterJS.Vector = { x: - this.body.velocity.x + windVector.x, y: - this.body.velocity.y + windVector.y }
+		const apparentWindVector = this.apparentWindVector();
 		return parseFloat(Math.sqrt(apparentWindVector.x ** 2 + apparentWindVector.y ** 2).toFixed(1))
 	}
 
-	private getApparentWindGlobalVector(): MatterJS.Vector {
-		const trueWind_TWS = this.windData.TWS;
-		const trueWind_GWD = this.windData.GWD; // Your TWD input
-
-		// This is your existing calculation, confirmed to be correct for your setup
-		const windRad = ((trueWind_GWD - 180) * Math.PI) / 180;
-		const trueWindGlobalVector = {
-			x: Math.sin(windRad) * trueWind_TWS,
-			y: Math.cos(windRad) * trueWind_TWS
-		};
-
-		// Apparent Wind = True Wind (global) - Boat Velocity (global)
-		// this.body.velocity is already in global Matter.js coordinates.
+	private apparentWindVector(): MatterJS.Vector {
 		return {
-			x: trueWindGlobalVector.x - this.body.velocity.x,
-			y: trueWindGlobalVector.y - this.body.velocity.y
+			x: this.windVector.x - this.body.velocity.x,
+			y: this.windVector.y - this.body.velocity.y
 		};
 	}
 
+	// Calculate apparent wind angle in degrees (0-359)
+	// 0 = wind from the bow, 90 = starboard beam, 180 = stern, 270 = port beam
 	getAWA = () => {
-		const windRadians = ((this.windData.GWD - 180) * Math.PI) / 180;
-		const windVector: MatterJS.Vector = { x: Math.sin(windRadians) * this.windData.TWS, y: Math.cos(windRadians) * this.windData.TWS }
-		const apparentWindVector: MatterJS.Vector = { x: - this.body.velocity.x + windVector.x, y: - this.body.velocity.y + windVector.y }
-		return (540 + utils.vectorHeading(apparentWindVector) - this.getHeading()) % 360 // where wind comes from not where it goes
-	}
+		const apparentWind = this.apparentWindVector();
+		if (Math.abs(apparentWind.x) < 0.01 && Math.abs(apparentWind.y) < 0.01) {
+			return 0; // No apparent wind
+		}
 
-	private getGlobalTrueWindVector(): MatterJS.Vector {
-		if (!this.windData) return { x: 0, y: 0 };
-		// Convert GWD (0=N, 90=E, meteorological) to math angle (0=E, 90=N, vector direction)
-		// Math angle = (450 - GWD) % 360 or ( (90 - GWD) + 360 ) % 360
-		const mathAngleDeg = (450 - this.windData.GWD) % 360;
-		const windRadians = utils.degreesToRadians(mathAngleDeg);
+		// Calculate the apparent wind angle relative to the world coordinates
+		let windAngleDegrees = utils.radiansToDegrees(Math.atan2(apparentWind.y, apparentWind.x));
 
-		const windX = Math.cos(windRadians) * this.windData.TWS;
-		const windY = Math.sin(windRadians) * this.windData.TWS;
-		return { x: windX, y: windY };
+		// Adjust to 0-359 range
+		windAngleDegrees = (windAngleDegrees + 360) % 360;
+
+		// Adjust by boat heading to get relative angle
+		const heading = this.getHeading();
+		let awa = (windAngleDegrees - heading + 270) % 360;
+
+		return Math.round(awa);
 	}
 
 

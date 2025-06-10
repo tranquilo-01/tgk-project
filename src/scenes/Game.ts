@@ -1,5 +1,6 @@
-import { Scene } from 'phaser';
+import { Scene, Utils } from 'phaser';
 import { Boat } from './objects/boat';
+import { vectorGeographicAngle, vectorLength } from './utils/utils';
 
 
 export class Game extends Scene {
@@ -14,9 +15,7 @@ export class Game extends Scene {
     cogLine: Phaser.GameObjects.Line;
     windParticles: Phaser.GameObjects.Graphics[] = [];
 
-    GWD: number = 180 // FIXME: something with the angles
-    TWS: number = 15
-
+    windVector: { x: number, y: number } = { x: -15, y: 0 };
 
     constructor() {
         super('Game');
@@ -70,7 +69,7 @@ export class Game extends Scene {
 
         // Replace old Boat creation with sprite-based Boat
         this.boat = new Boat(this, 1500, 5900, 20, 30, 12000, 4.5);
-        this.boat.updateWindData(this.TWS, this.GWD);
+        this.boat.updateWindVector(this.windVector);
 
         // Mainsail visualisation rectangle
         const sailLength = 50;
@@ -147,8 +146,6 @@ export class Game extends Scene {
             const cog = this.boat.getCOG();
             const sog = this.boat.getSOG();
             const position = this.boat.getPosition();
-            const TWS = this.TWS
-            const GWD = this.GWD
             const AWS = this.boat.getAWS()
             const AWA = this.boat.getAWA()
 
@@ -158,23 +155,21 @@ export class Game extends Scene {
             COG: ${cog}
             SOG: ${sog}
             Position: ${Math.floor(position.x)}, ${Math.floor(position.y)}
-            TWS: ${TWS} GWD: ${GWD}
+            Wind Vector: ${this.windVector.x.toFixed(2)}, ${this.windVector.y.toFixed(2)}
+            TWS: ${vectorLength(this.windVector)} GWD: ${(vectorGeographicAngle(this.windVector) + 180) % 360}
             AWS: ${AWS} AWA: ${AWA}
             Tack: ${this.boat.getTack()}
             Sail Angle: ${this.boat.getSailAngle(AWA)}
             Andle of Attack: ${this.boat.getAngleOfAttack()}
-            ApparentWind: ${AWS.toFixed(2)}, ${AWA.toFixed(2)}
-            SailLiftVector: ${this.boat.getLiftForce().x.toFixed(2)}, ${this.boat.getLiftForce().y.toFixed(2)}
-            SailDragVector: ${this.boat.getDragForce().x.toFixed(2)}, ${this.boat.getDragForce().y.toFixed(2)}
-            WaterDragVector: ${this.boat.getWaterDragVector().x.toFixed(2)}, ${this.boat.getWaterDragVector().y.toFixed(2)}
+            SailLiftVector: ${this.boat.liftForce().x.toFixed(2)}, ${this.boat.liftForce().y.toFixed(2)}
+            SailDragVector: ${this.boat.sailDragForce().x.toFixed(2)}, ${this.boat.sailDragForce().y.toFixed(2)}
+            WaterDragVector: ${this.boat.waterDragVector().x.toFixed(2)}, ${this.boat.waterDragVector().y.toFixed(2)}
             AntiDriftVector: ${this.boat.getAntiDriftForce().x.toFixed(2)}, ${this.boat.getAntiDriftForce().y.toFixed(2)}`);
 
             // Wind particles update
-            const windRad = Phaser.Math.DegToRad(this.GWD + 180);
-            const windSpeed = this.TWS; // visual speed factor
             for (const p of this.windParticles) {
-                p.x += Math.sin(windRad) * windSpeed * 0.2; // FIXME: something with the angles
-                p.y += Math.cos(windRad) * windSpeed * 0.2; // FIXME: something with the angles
+                p.x += this.windVector.x * 0.2;
+                p.y += this.windVector.y * 0.2;
                 // Wrap around world bounds
                 if (p.x < 0) p.x += 3000;
                 if (p.x > 3000) p.x -= 3000;
@@ -185,7 +180,7 @@ export class Game extends Scene {
     }
 
     update() {
-        this.boat.updateWindData(this.TWS, this.GWD)
+        this.boat.updateWindVector(this.windVector)
         this.moveWithWSAD()
         this.boat.applyFrictionForces()
         this.boat.applySailForces()
