@@ -129,7 +129,7 @@ export class Game extends Scene {
         this.events.on('update', () => {
             // Update sail visualisation
             const boatPos = this.boat.sprite;
-            const sailAngle = this.boat.getSailAngle(this.boat.getAWA());
+            const sailAngle = this.boat.sailAngle();
             this.sailRect.x = boatPos.x;
             this.sailRect.y = boatPos.y;
             this.sailRect.rotation = boatPos.rotation + Phaser.Math.DegToRad(sailAngle + 180);
@@ -151,7 +151,7 @@ export class Game extends Scene {
 
 
             overlay.setText(`
-            Heading: ${heading}
+            Heading: ${heading} 
             COG: ${cog}
             SOG: ${sog}
             Position: ${Math.floor(position.x)}, ${Math.floor(position.y)}
@@ -159,9 +159,14 @@ export class Game extends Scene {
             TWS: ${vectorLength(this.windVector)} GWD: ${(vectorGeographicAngle(this.windVector) + 180) % 360}
             AWS: ${AWS} AWA: ${AWA}
             Tack: ${this.boat.getTack()}
-            Sail Angle: ${this.boat.getSailAngle(AWA)}
+            Trimmed sail angle: ${this.boat.trimmedSailAngle.toFixed(2)}
+            Sail Angle: ${this.boat.sailAngle()}
             Andle of Attack: ${this.boat.getAngleOfAttack()}
+            Lift coefficient: ${this.boat.liftCoefficient().toFixed(2)}
+            Lift unit vector: ${this.boat.liftUnitVector().x.toFixed(2)}, ${this.boat.liftUnitVector().y.toFixed(2)}
             SailLiftVector: ${this.boat.liftForce().x.toFixed(2)}, ${this.boat.liftForce().y.toFixed(2)}
+            Drag unit vector: ${this.boat.dragUnitVector().x.toFixed(2)}, ${this.boat.dragUnitVector().y.toFixed(2)}
+            Drag coefficient: ${this.boat.sailDragCoefficient().toFixed(2)}
             SailDragVector: ${this.boat.sailDragForce().x.toFixed(2)}, ${this.boat.sailDragForce().y.toFixed(2)}
             WaterDragVector: ${this.boat.waterDragVector().x.toFixed(2)}, ${this.boat.waterDragVector().y.toFixed(2)}
             AntiDriftVector: ${this.boat.getAntiDriftForce().x.toFixed(2)}, ${this.boat.getAntiDriftForce().y.toFixed(2)}`);
@@ -209,10 +214,10 @@ export class Game extends Scene {
         // const forceY = -Math.cos(rotation) * forceMagnitude;
 
         if (wKey.isDown) {
-            this.boat.takeSail(0.08);
+            this.boat.takeSail(0.12);
         }
         if (sKey.isDown) {
-            this.boat.giveSail(0.08);
+            this.boat.giveSail(0.12);
         }
         if (aKey.isDown) {
             this.boat.applyTorque(-0.005);

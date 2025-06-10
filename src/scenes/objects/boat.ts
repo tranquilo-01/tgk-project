@@ -134,11 +134,28 @@ export class Boat {
 		}
 	}
 
-	getSailAngle(awa: number): number {
+	sailAngle(): number {
+		const awa = this.getAWA();
 		if (awa < 180) {
-			return this.trimmedSailAngle;
+			// stb tack
+			if (awa >= this.trimmedSailAngle) {
+				// ok
+				return this.trimmedSailAngle;
+			}
+			// in irons
+			else {
+				return awa;
+			}
+			// port tack
 		} else {
-			return - this.trimmedSailAngle;
+			// ok
+			if (360 - awa >= this.trimmedSailAngle) {
+				return - this.trimmedSailAngle;
+			}
+			// in irons
+			else {
+				return awa - 360;
+			}
 		}
 	}
 
@@ -155,7 +172,7 @@ export class Boat {
 	getAngleOfAttack(): number {
 		const awa = this.getAWA(); // 0-360 relative to bow
 		// sailAngle is angle of sail relative to boat centerline (+ starboard, - port)
-		const sailAngleSigned = this.getSailAngle(awa);
+		const sailAngleSigned = this.sailAngle();
 
 		// Convert AWA to +/- 180 range (e.g. 315 AWA -> -45 deg)
 		let awaSymmetric = awa > 180 ? awa - 360 : awa;
@@ -165,7 +182,7 @@ export class Boat {
 		return angleOfAttack;
 	}
 
-	getLiftUnitVector(): MatterJS.Vector {
+	liftUnitVector(): MatterJS.Vector {
 		const apparentWindVec = this.apparentWindVector();
 		const aws = Math.sqrt(apparentWindVec.x ** 2 + apparentWindVec.y ** 2);
 
@@ -200,7 +217,7 @@ export class Boat {
 	liftForce(): MatterJS.Vector {
 		const coeff = 0.01;
 		const magnitude = coeff * (this.getAWS()) ** 2 * this.liftCoefficient();
-		const liftUnitVector = this.getLiftUnitVector();
+		const liftUnitVector = this.liftUnitVector();
 
 		const liftForceX = liftUnitVector.x * magnitude;
 		const liftForceY = liftUnitVector.y * magnitude;
@@ -208,14 +225,14 @@ export class Boat {
 		return liftForce;
 	}
 
-	dragCoefficient(): number {
+	sailDragCoefficient(): number {
 		const angleOfAttack = this.getAngleOfAttack();
-		if (angleOfAttack > 0 && angleOfAttack <= 11) {
+		if (angleOfAttack >= 0 && angleOfAttack <= 11) {
 			return 0.11
 		} else if (angleOfAttack > 11 && angleOfAttack <= 90) {
-			return -(1.35 / 6400) * (angleOfAttack - 10) ** 2 + 0.15
+			return (1.35 / 6400) * (angleOfAttack - 10) ** 2 + 0.15
 		} else if (angleOfAttack > 90 && angleOfAttack <= 170) {
-			return -(1.35 / 6400) * (angleOfAttack - 170) ** 2 + 1.5
+			return (1.35 / 6400) * (angleOfAttack - 170) ** 2 + 0.15
 		} else {
 			return 0
 		}
@@ -225,7 +242,7 @@ export class Boat {
 		const apparentWindVec = this.apparentWindVector();
 		const aws = Math.sqrt(apparentWindVec.x ** 2 + apparentWindVec.y ** 2);
 
-		if (aws < 0.001) { // Avoid division by zero for very low speeds
+		if (aws < 0.01) { // Avoid division by zero for very low speeds
 			return { x: 0, y: 0 };
 		}
 		// Drag force is in the direction of the global apparent wind
@@ -234,14 +251,14 @@ export class Boat {
 
 	sailDragForce(): MatterJS.Vector {
 		const coeff = 0.01;
-		const magnitude = coeff * (this.getAWS()) ** 2 * this.dragCoefficient();
+		const magnitude = coeff * (this.getAWS()) ** 2 * this.sailDragCoefficient();
 		const dragUnitVector = this.dragUnitVector();
 
 		const dragForceX = dragUnitVector.x * magnitude;
 		const dragForceY = dragUnitVector.y * magnitude;
 		const dragForce: MatterJS.Vector = { x: dragForceX, y: dragForceY };
-		// return dragForce;
-		return { x: 0, y: 0 };
+		return dragForce;
+		// return { x: 0, y: 0 };
 	}
 
 	// --------------------plotter data--------------------
