@@ -12,11 +12,6 @@ export class MainMenu extends Scene {
 
     create(data: { level?: number }) // Accept data, though not used directly here for now
     {
-        this.background = this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, 'background');
-        // Scale background to fit screen if necessary - or ensure it's large enough
-        // this.background.setDisplaySize(this.cameras.main.width, this.cameras.main.height);
-
-        this.logo = this.add.image(this.cameras.main.centerX, this.cameras.main.centerY - 100, 'logo').setOrigin(0.5);
 
         this.title = this.add.text(this.cameras.main.centerX, this.cameras.main.centerY + 50, 'Main Menu', {
             fontFamily: 'Arial Black', fontSize: 38, color: '#ffffff',
