@@ -1,0 +1,1 @@
+On the right side on the screen create the data view overlay similar to the one on raymarine chartplotters. The data are displayed in two columns. Rows are: time, sog | heading, cog | TWS, GWD | AWS, AWA. now there are two sliders with range 0 - 90 taking space of the whole row: trimmed sail angle | sail angle

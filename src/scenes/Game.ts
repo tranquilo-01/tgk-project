@@ -1,4 +1,4 @@
-import { Scene, Utils } from 'phaser';
+import { Scene } from 'phaser';
 import { Boat } from './objects/boat';
 import { vectorGeographicAngle, vectorLength } from './utils/utils';
 
@@ -16,7 +16,34 @@ export class Game extends Scene {
     windParticles: Phaser.GameObjects.Graphics[] = [];
     windVector: { x: number, y: number } = { x: -15, y: 0 };
     debugOverlay: Phaser.GameObjects.Text | null = null; // Debug overlay text
-    isDebugOverlay: boolean = true; // Flag to toggle debug overlay
+    isDebugOverlay: boolean = false; // Flag to toggle debug overlay
+
+    // Data View Overlay Elements
+    dataViewOverlayContainer: Phaser.GameObjects.Container;
+    timeValueText: Phaser.GameObjects.Text;
+    sogValueText: Phaser.GameObjects.Text;
+    headingValueText: Phaser.GameObjects.Text;
+    cogValueText: Phaser.GameObjects.Text;
+    twsValueText: Phaser.GameObjects.Text;
+    gwdValueText: Phaser.GameObjects.Text;
+    awsValueText: Phaser.GameObjects.Text;
+    awaValueText: Phaser.GameObjects.Text;
+
+    trimmedSailAngleSliderTrack: Phaser.GameObjects.Graphics;
+    trimmedSailAngleSliderHandle: Phaser.GameObjects.Graphics;
+    trimmedSailAngleValueText: Phaser.GameObjects.Text;
+
+    sailAngleSliderTrack: Phaser.GameObjects.Graphics;
+    sailAngleSliderHandle: Phaser.GameObjects.Graphics;
+    sailAngleValueText: Phaser.GameObjects.Text;
+
+    gameTime: number = 0; // To keep track of elapsed time
+
+    // Store slider dimensions for later use
+    private sliderTrackWidthConst: number;
+    private sliderTrackHeightConst: number;
+    private sliderHandleWidthConst: number;
+    private sliderHandleHeightConst: number;
 
     constructor() {
         super('Game');
@@ -130,9 +157,13 @@ export class Game extends Scene {
                 this.scene.start('GameOver');
             }
         };
+
+        this._createDataViewOverlayElements();
     }
 
-    update() {
+    update(time: number, delta: number) { // time parameter is used by Phaser, keep it
+        this.gameTime += delta / 1000; // Update game time in seconds
+
         this.boat.updateWindVector(this.windVector)
         this.moveWithWSAD()
         this.boat.applyFrictionForces()
@@ -148,6 +179,8 @@ export class Game extends Scene {
         if (this.isDebugOverlay && this.debugOverlay) { // Ensure overlay exists before updating
             this.displayDebugOverlay();
         }
+
+        this._updateDataViewOverlay();
     }
 
     registerWSAD() {
@@ -232,5 +265,134 @@ export class Game extends Scene {
         SailDragVector: ${this.boat.sailDragForce().x.toFixed(2)}, ${this.boat.sailDragForce().y.toFixed(2)}
         WaterDragVector: ${this.boat.waterDragVector().x.toFixed(2)}, ${this.boat.waterDragVector().y.toFixed(2)}
         AntiDriftVector: ${this.boat.getAntiDriftForce().x.toFixed(2)}, ${this.boat.getAntiDriftForce().y.toFixed(2)}`);
+    }
+
+    private _createDataViewOverlayElements() {
+        this.gameTime = 0;
+        const overlayWidth = 350; // Increased width
+        const overlayHeight = 320; // Increased height
+        const padding = 10;
+        const screenWidth = this.scale.width;
+
+        this.dataViewOverlayContainer = this.add.container(screenWidth - overlayWidth - padding, padding);
+        this.dataViewOverlayContainer.setScrollFactor(0).setDepth(20);
+
+        const background = this.add.graphics();
+        background.fillStyle(0x000000, 0.6);
+        background.fillRect(0, 0, overlayWidth, overlayHeight);
+        this.dataViewOverlayContainer.add(background);
+
+        const labelStyle = { font: '14px Arial', fill: '#cccccc' }; // Slightly larger label font
+        const valueStyle = { font: '24px Arial', fill: '#ffffff' }; // Slightly larger value font
+        const valueStyleRight = { ...valueStyle, align: 'right' as 'right' };
+        const sliderValueStyle = { font: '16px Arial', fill: '#ffffff' }; // Slightly larger slider value font
+
+
+        let currentY = padding;
+        const col1X = padding;
+        const col2X = overlayWidth / 2 + padding / 2;
+        const colWidth = overlayWidth / 2 - padding * 1.5;
+
+
+        // Row 1: Time | SOG
+        this.dataViewOverlayContainer.add(this.add.text(col1X, currentY, "TIME", labelStyle));
+        this.dataViewOverlayContainer.add(this.add.text(col2X, currentY, "SOG", labelStyle));
+        currentY += 18; // Adjusted spacing
+        this.timeValueText = this.add.text(col1X, currentY, "00:00:00", valueStyle);
+        this.sogValueText = this.add.text(col2X + colWidth, currentY, "0.0kts", valueStyleRight).setOrigin(1, 0);
+        this.dataViewOverlayContainer.add([this.timeValueText, this.sogValueText]);
+        currentY += 30; // Adjusted spacing
+
+        // Row 2: Heading | COG
+        this.dataViewOverlayContainer.add(this.add.text(col1X, currentY, "HEADING", labelStyle));
+        this.dataViewOverlayContainer.add(this.add.text(col2X, currentY, "COG", labelStyle));
+        currentY += 18; // Adjusted spacing
+        this.headingValueText = this.add.text(col1X, currentY, "0°", valueStyle);
+        this.cogValueText = this.add.text(col2X + colWidth, currentY, "0°", valueStyleRight).setOrigin(1, 0);
+        this.dataViewOverlayContainer.add([this.headingValueText, this.cogValueText]);
+        currentY += 30; // Adjusted spacing
+
+        // Row 3: TWS | GWD
+        this.dataViewOverlayContainer.add(this.add.text(col1X, currentY, "TWS", labelStyle));
+        this.dataViewOverlayContainer.add(this.add.text(col2X, currentY, "GWD", labelStyle));
+        currentY += 18; // Adjusted spacing
+        this.twsValueText = this.add.text(col1X, currentY, "0.0kts", valueStyle);
+        this.gwdValueText = this.add.text(col2X + colWidth, currentY, "0°", valueStyleRight).setOrigin(1, 0);
+        this.dataViewOverlayContainer.add([this.twsValueText, this.gwdValueText]);
+        currentY += 30; // Adjusted spacing
+
+        // Row 4: AWS | AWA
+        this.dataViewOverlayContainer.add(this.add.text(col1X, currentY, "AWS", labelStyle));
+        this.dataViewOverlayContainer.add(this.add.text(col2X, currentY, "AWA", labelStyle));
+        currentY += 18; // Adjusted spacing
+        this.awsValueText = this.add.text(col1X, currentY, "0.0kts", valueStyle);
+        this.awaValueText = this.add.text(col2X + colWidth, currentY, "0°", valueStyleRight).setOrigin(1, 0);
+        this.dataViewOverlayContainer.add([this.awsValueText, this.awaValueText]);
+        currentY += 35; // More space before sliders
+
+        // Sliders
+        this.sliderTrackWidthConst = overlayWidth - padding * 2;
+        this.sliderTrackHeightConst = 10; // Slightly thicker track
+        this.sliderHandleWidthConst = 8; // Slightly wider handle
+        this.sliderHandleHeightConst = 20; // Slightly taller handle
+
+        // Trimmed Sail Angle Slider
+        this.dataViewOverlayContainer.add(this.add.text(col1X, currentY, "TRIMMED SAIL ANGLE", labelStyle));
+        this.trimmedSailAngleValueText = this.add.text(col1X + this.sliderTrackWidthConst, currentY + 2, "0°", sliderValueStyle).setOrigin(1, 0);
+        this.dataViewOverlayContainer.add(this.trimmedSailAngleValueText);
+        currentY += 20; // Adjusted spacing
+        this.trimmedSailAngleSliderTrack = this.add.graphics().fillStyle(0x444444).fillRect(0, 0, this.sliderTrackWidthConst, this.sliderTrackHeightConst);
+        this.trimmedSailAngleSliderTrack.setPosition(col1X, currentY);
+        this.trimmedSailAngleSliderHandle = this.add.graphics().fillStyle(0xeeeeee).fillRect(0, - (this.sliderHandleHeightConst - this.sliderTrackHeightConst) / 2, this.sliderHandleWidthConst, this.sliderHandleHeightConst);
+        this.dataViewOverlayContainer.add([this.trimmedSailAngleSliderTrack, this.trimmedSailAngleSliderHandle]);
+        currentY += this.sliderTrackHeightConst + 18; // Adjusted spacing
+
+
+        // Sail Angle Slider
+        this.dataViewOverlayContainer.add(this.add.text(col1X, currentY, "SAIL ANGLE", labelStyle));
+        this.sailAngleValueText = this.add.text(col1X + this.sliderTrackWidthConst, currentY + 2, "0°", sliderValueStyle).setOrigin(1, 0);
+        this.dataViewOverlayContainer.add(this.sailAngleValueText);
+        currentY += 20; // Adjusted spacing
+        this.sailAngleSliderTrack = this.add.graphics().fillStyle(0x444444).fillRect(0, 0, this.sliderTrackWidthConst, this.sliderTrackHeightConst);
+        this.sailAngleSliderTrack.setPosition(col1X, currentY);
+        this.sailAngleSliderHandle = this.add.graphics().fillStyle(0xeeeeee).fillRect(0, -(this.sliderHandleHeightConst - this.sliderTrackHeightConst) / 2, this.sliderHandleWidthConst, this.sliderHandleHeightConst);
+        this.dataViewOverlayContainer.add([this.sailAngleSliderTrack, this.sailAngleSliderHandle]);
+    }
+
+    private _updateDataViewOverlay() {
+        if (!this.boat || !this.dataViewOverlayContainer) return;
+
+        // Update Time
+        const totalSeconds = Math.floor(this.gameTime);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        this.timeValueText.setText(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
+
+        // Update Boat Data
+        this.sogValueText.setText(`${this.boat.getSOG().toFixed(1)}kts`);
+        this.headingValueText.setText(`${this.boat.getHeading()}°`);
+        this.cogValueText.setText(`${this.boat.getCOG()}°`);
+
+        // Update Wind Data
+        const tws = vectorLength(this.windVector);
+        const gwd = (vectorGeographicAngle(this.windVector) + 180) % 360; // Assuming windVector is 'coming from'
+        this.twsValueText.setText(`${tws.toFixed(1)}kts`);
+        this.gwdValueText.setText(`${Math.round(gwd)}°`);
+        this.awsValueText.setText(`${this.boat.getAWS().toFixed(1)}kts`);
+        this.awaValueText.setText(`${this.boat.getAWA()}°`);
+
+        // Update Sliders
+        // const sliderTrackWidth = this.trimmedSailAngleSliderTrack.width; // Use stored constant
+
+        const trimmedSailAngle = this.boat.trimmedSailAngle; // 0-90
+        const trimmedHandleX = this.trimmedSailAngleSliderTrack.x + (trimmedSailAngle / 90) * (this.sliderTrackWidthConst - this.sliderHandleWidthConst);
+        this.trimmedSailAngleSliderHandle.setPosition(trimmedHandleX, this.trimmedSailAngleSliderTrack.y + this.sliderTrackHeightConst / 2);
+        this.trimmedSailAngleValueText.setText(`${trimmedSailAngle.toFixed(0)}°`);
+
+        const sailAngle = Math.abs(this.boat.sailAngle()); // 0-90
+        const sailHandleX = this.sailAngleSliderTrack.x + (sailAngle / 90) * (this.sliderTrackWidthConst - this.sliderHandleWidthConst);
+        this.sailAngleSliderHandle.setPosition(sailHandleX, this.sailAngleSliderTrack.y + this.sliderTrackHeightConst / 2);
+        this.sailAngleValueText.setText(`${sailAngle.toFixed(0)}°`);
     }
 }
