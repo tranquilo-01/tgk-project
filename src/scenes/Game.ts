@@ -14,7 +14,7 @@ export class Game extends Scene {
     headingLine: Phaser.GameObjects.Line;
     cogLine: Phaser.GameObjects.Line;
     windParticles: Phaser.GameObjects.Graphics[] = [];
-    windVector: { x: number, y: number } = { x: -10, y: 20 };
+    windVector: { x: number, y: number } = { x: -5, y: 15 };
     debugOverlay: Phaser.GameObjects.Text | null = null; // Debug overlay text
     isDebugOverlay: boolean = false; // Flag to toggle debug overlay
 
@@ -138,7 +138,7 @@ export class Game extends Scene {
         });
 
         // Replace old Boat creation with sprite-based Boat
-        this.boat = new Boat(this, 1500, 5900, 20, 30, 12000, 4.5);
+        this.boat = new Boat(this, 1500, 5700, 20, 30, 12000, 4.5);
         this.boat.updateWindVector(this.windVector);
 
         // Mainsail visualisation rectangle
@@ -341,16 +341,16 @@ export class Game extends Scene {
         const dKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
 
         if (wKey.isDown) {
-            this.boat.takeSail(0.12);
+            this.boat.takeSail(0.15);
         }
         if (sKey.isDown) {
-            this.boat.giveSail(0.12);
+            this.boat.giveSail(0.15);
         }
         if (aKey.isDown) {
-            this.boat.applyTorque(-0.005);
+            this.boat.applyTorque(-0.008);
         }
         if (dKey.isDown) {
-            this.boat.applyTorque(0.005);
+            this.boat.applyTorque(0.008);
         }
     }
 

@@ -64,8 +64,7 @@ export class Boat {
 	}
 
 	applyAntiRotationTorque() {
-		const sign = - Math.sign(this.body.angularVelocity);
-		this.body.torque += sign * 0.002;
+		this.body.torque -= this.body.angularVelocity * 0.4;
 	}
 
 	applySailForces() {
