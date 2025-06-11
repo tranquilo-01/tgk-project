@@ -14,7 +14,7 @@ export class Game extends Scene {
     headingLine: Phaser.GameObjects.Line;
     cogLine: Phaser.GameObjects.Line;
     windParticles: Phaser.GameObjects.Graphics[] = [];
-    windVector: { x: number, y: number } = { x: -15, y: 0 };
+    windVector: { x: number, y: number } = { x: -10, y: 20 };
     debugOverlay: Phaser.GameObjects.Text | null = null; // Debug overlay text
     isDebugOverlay: boolean = false; // Flag to toggle debug overlay
 
@@ -49,6 +49,7 @@ export class Game extends Scene {
     private currentLevel: number = 1;
     private gameStarted: boolean = false;
     private pressSpaceText: Phaser.GameObjects.Text;
+    private restartLevelButton: Phaser.GameObjects.Text; // Added for restart button
     private finishLine: {
         startDot: Phaser.GameObjects.Ellipse,
         endDot: Phaser.GameObjects.Ellipse,
@@ -74,46 +75,66 @@ export class Game extends Scene {
         const worldHeight = 6000;
         this.matter.world.setBounds(0, 0, worldWidth, worldHeight);
         this.camera = this.cameras.main;
-        // Blue background for sea
-        this.add.rectangle(1500, 3000, 3000, 6000, 0x1e90ff).setDepth(-2);
+        // Light blue background for sea (overall background)
+        this.add.rectangle(1500, 3000, 3000, 6000, 0xd1fdfc).setDepth(-3); // Deepest layer
         this.background = this.add.tileSprite(0, 0, 10000, 10000, 'sea').setVisible(false); // Hide old background
 
         // Generate green islands (static bodies)
         this.islands = [];
-        // More, denser, and varied islands
+        // Fewer, larger, and more irregular islands
         const islandData = [
-            // Ellipses
-            { x: 600, y: 1200, r: 180, shape: 'ellipse' },
-            { x: 2200, y: 800, r: 140, shape: 'ellipse' },
-            { x: 1500, y: 3000, r: 220, shape: 'ellipse' },
-            { x: 900, y: 5000, r: 160, shape: 'ellipse' },
-            { x: 2500, y: 4000, r: 200, shape: 'ellipse' },
-            { x: 800, y: 2000, r: 120, shape: 'ellipse' },
-            { x: 2100, y: 1800, r: 110, shape: 'ellipse' },
-            { x: 1200, y: 4000, r: 130, shape: 'ellipse' },
-            { x: 1800, y: 5000, r: 100, shape: 'ellipse' },
-            { x: 2300, y: 5200, r: 120, shape: 'ellipse' },
-            // Rectangles
-            { x: 1000, y: 2500, w: 300, h: 120, shape: 'rect' },
-            { x: 2000, y: 3500, w: 200, h: 180, shape: 'rect' },
-            { x: 1700, y: 1500, w: 250, h: 100, shape: 'rect' },
-            { x: 600, y: 3500, w: 180, h: 180, shape: 'rect' },
-            { x: 2500, y: 2500, w: 220, h: 120, shape: 'rect' },
-            { x: 1300, y: 1000, w: 180, h: 180, shape: 'rect' },
-            { x: 2000, y: 4700, w: 200, h: 120, shape: 'rect' },
-            { x: 700, y: 4200, w: 160, h: 160, shape: 'rect' },
-            { x: 2300, y: 3200, w: 180, h: 180, shape: 'rect' },
+            // Large main island mass (composed of several overlapping ellipses)
+            { x: 800, y: 1500, r: 400, shape: 'ellipse' },
+            { x: 1200, y: 1700, r: 350, shape: 'ellipse' },
+            { x: 900, y: 2000, r: 300, shape: 'ellipse' },
+            { x: 600, y: 1800, r: 250, shape: 'ellipse' },
+
+            // Second large island mass
+            { x: 2200, y: 3500, r: 500, shape: 'ellipse' },
+            { x: 2500, y: 3800, r: 400, shape: 'ellipse' },
+            { x: 2000, y: 3200, r: 300, shape: 'ellipse' },
+
+            // Smaller, irregular islands
+            { x: 500, y: 4500, r: 250, shape: 'ellipse' },
+            { x: 700, y: 4700, r: 180, shape: 'ellipse' },
+
+            { x: 1800, y: 800, r: 220, shape: 'ellipse' },
+            { x: 2000, y: 600, r: 180, shape: 'ellipse' },
+
+            // A more rectangular-like feature using ellipses
+            { x: 1500, y: 5000, r: 150, shape: 'ellipse' },
+            { x: 1600, y: 5050, r: 150, shape: 'ellipse' },
+            { x: 1400, y: 4950, r: 150, shape: 'ellipse' },
+
+            // Some smaller "rocks" or islets
+            { x: 2800, y: 1200, r: 80, shape: 'ellipse' },
+            { x: 2700, y: 5200, r: 100, shape: 'ellipse' },
+            { x: 300, y: 800, r: 90, shape: 'ellipse' },
         ];
+
+        const shoalColor = 0x7ad9f7;
+        const islandColor = 0xc8cc9c;
+        const contourColor = 0x000000;
+        const contourThickness = 0.5;
+        const shoalDepth = -2; // Above sea, below islands
+        const islandDepth = -1; // Above shoals
+
         islandData.forEach(isle => {
-            let island: Phaser.GameObjects.Ellipse | Phaser.GameObjects.Rectangle | undefined;
             if (isle.shape === 'ellipse' && typeof isle.r === 'number') {
-                island = this.add.ellipse(isle.x, isle.y, isle.r * 2, isle.r * 2, 0x228B22).setDepth(-1);
-                this.matter.add.gameObject(island, { shape: { type: 'circle', radius: isle.r }, isStatic: true });
-            } else if (isle.shape === 'rect' && typeof isle.w === 'number' && typeof isle.h === 'number') {
-                island = this.add.rectangle(isle.x, isle.y, isle.w, isle.h, 0x228B22).setDepth(-1);
-                this.matter.add.gameObject(island, { shape: { type: 'rectangle', width: isle.w, height: isle.h }, isStatic: true });
+                // Add shoal layer first (larger radius)
+                const shoalRadius = isle.r * 1.3; // Shoal is 30% larger than the island part
+                this.add.ellipse(isle.x, isle.y, shoalRadius * 2, shoalRadius * 2, shoalColor)
+                    .setStrokeStyle(contourThickness, contourColor)
+                    .setDepth(shoalDepth);
+
+                // Add island layer on top of the shoal
+                const islandSprite = this.add.ellipse(isle.x, isle.y, isle.r * 2, isle.r * 2, islandColor)
+                    .setStrokeStyle(contourThickness, contourColor)
+                    .setDepth(islandDepth);
+
+                this.matter.add.gameObject(islandSprite, { shape: { type: 'circle', radius: isle.r }, isStatic: true });
+                this.islands.push(islandSprite);
             }
-            if (island) this.islands.push(island);
         });
 
         // Replace old Boat creation with sprite-based Boat
@@ -143,7 +164,7 @@ export class Game extends Scene {
             const x = Math.random() * 3000;
             const y = Math.random() * 6000;
             const g = this.add.graphics();
-            g.fillStyle(0xffffff, 0.85); // white, more visible
+            g.fillStyle(0x6b81fa, 0.85); // white, more visible
             g.fillEllipse(0, 0, 4, 4); // slightly larger for visibility
             g.alpha = 0.85 + Math.random() * 0.15;
             g.x = x;
@@ -161,23 +182,52 @@ export class Game extends Scene {
         }
 
 
-        // Collision with islands or world bounds ends game
-        this.matter.world.on('collisionstart', (event: any) => {
-            event.pairs.forEach((pair: any) => {
-                if (
-                    (pair.bodyA === this.boat.body && this.islands.some(isle => isle.body === pair.bodyB)) ||
-                    (pair.bodyB === this.boat.body && this.islands.some(isle => isle.body === pair.bodyA))
-                ) {
-                    this.scene.start('GameOver');
+        // Consolidated collision handling
+        this.matter.world.on('collisionstart', (event: Phaser.Physics.Matter.Events.CollisionStartEvent) => {
+            event.pairs.forEach((pair: Phaser.Types.Physics.Matter.MatterCollisionPair) => {
+                const bodyA = pair.bodyA as MatterJS.BodyType;
+                const bodyB = pair.bodyB as MatterJS.BodyType;
+                const walls = this.matter.world.walls;
+
+                let isBoatInvolved = false;
+                let otherBodyForBoat: MatterJS.BodyType | null = null;
+
+                if (bodyA === this.boat.body) {
+                    isBoatInvolved = true;
+                    otherBodyForBoat = bodyB;
+                } else if (bodyB === this.boat.body) {
+                    isBoatInvolved = true;
+                    otherBodyForBoat = bodyA;
+                }
+
+                if (isBoatInvolved && otherBodyForBoat) {
+                    const triggerGameOver = () => {
+                        if (this.sys.isActive()) { // Check if current scene is active
+                            if (this.restartLevelButton) this.restartLevelButton.setVisible(false);
+                            this.matter.world.pause(); // Pause physics before switching scenes
+                            this.scene.start('GameOver', { level: this.currentLevel, time: this.gameTime });
+                        }
+                    };
+
+                    // Check for island collision
+                    if (this.islands.some(isle => isle.body === otherBodyForBoat)) {
+                        triggerGameOver();
+                        return; // Collision handled
+                    }
+
+                    // Check for world wall collision
+                    if (walls && otherBodyForBoat.isStatic &&
+                        (otherBodyForBoat === walls.left ||
+                            otherBodyForBoat === walls.right ||
+                            otherBodyForBoat === walls.top ||
+                            otherBodyForBoat === walls.bottom)) {
+                        triggerGameOver();
+                        return; // Collision handled
+                    }
                 }
             });
         });
-        // World bounds collision
-        this.boat.body.onCollideCallback = (data: any) => {
-            if (data.bodyB.isStatic && (data.bodyB.label === 'Rectangle Body' || data.bodyB.label === 'Circle Body')) {
-                this.scene.start('GameOver', { level: this.currentLevel, time: this.gameTime });
-            }
-        };
+        // World bounds collision (Removed: this.boat.body.onCollideCallback)
 
         this._createDataViewOverlayElements();
 
@@ -212,17 +262,38 @@ export class Game extends Scene {
         }
         // Initialize boatPreviousY with the boat's starting y position
         this.boatPreviousY = this.boat.getPosition().y;
+
+        // Restart Level Button
+        const buttonPadding = 15;
+        this.restartLevelButton = this.add.text(buttonPadding, buttonPadding, 'Restart Level', {
+            fontFamily: 'Arial',
+            fontSize: '20px',
+            color: '#ffffff',
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            padding: { x: 10, y: 5 }
+        })
+            .setScrollFactor(0)
+            .setDepth(30)
+            .setInteractive()
+            .setVisible(false); // Initially hidden
+
+        this.restartLevelButton.on('pointerdown', () => {
+            if (this.gameStarted) { // Only allow restart if game is active
+                this.scene.start('Game', { level: this.currentLevel });
+            }
+        });
     }
 
     private startGame() {
         this.gameStarted = true;
         this.pressSpaceText.setVisible(false);
+        if (this.restartLevelButton) this.restartLevelButton.setVisible(true); // Show restart button
         this.matter.world.resume();
         this.levelStartTime = this.gameTime; // Record start time when space is pressed
         this.boatPreviousY = this.boat.getPosition().y; // Ensure this is set when the game actually starts moving
     }
 
-    update(time: number, delta: number) { // time parameter is used by Phaser, keep it
+    update(_time: number, delta: number) { // time parameter is used by Phaser, but not directly in this function body, marked as _time
         const currentBoatY = this.boat.getPosition().y;
         if (!this.gameStarted) {
             // Game hasn't started, camera might be fixed or follow a pre-defined path
@@ -474,37 +545,57 @@ export class Game extends Scene {
 
         const boatPositionX = this.boat.getPosition().x;
 
+        // Check if the boat crossed the line in the northward direction
         if (currentBoatY < this.finishLine.line.y1 &&
+            this.boatPreviousY >= this.finishLine.line.y1 && // Ensures crossing happened in this frame
             boatPositionX >= this.finishLine.line.x1 &&
             boatPositionX <= this.finishLine.line.x2) {
-
-            // Check if previous y was at or below the line, and current y is above
-            if (this.boatPreviousY >= this.finishLine.line.y1) {
-                this.levelCompleted();
-            }
+            this.levelCompleted();
         }
     }
 
     private levelCompleted() {
-        this.gameStarted = false; // Stop game updates
-        this.matter.world.pause();
-        const levelTime = this.gameTime - this.levelStartTime;
+        this.gameStarted = false;
+        this.matter.world.pause(); // Pause physics
+        if (this.restartLevelButton) {
+            this.restartLevelButton.setVisible(false); // Hide restart button
+        }
 
-        // Display level completed message
-        this.add.text(this.cameras.main.centerX, this.cameras.main.centerY - 50,
-            `Level ${this.currentLevel} Completed!\nTime: ${levelTime.toFixed(2)}s`,
-            { fontFamily: 'Arial', fontSize: '40px', color: '#00ff00', stroke: '#000000', strokeThickness: 6, align: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }
-        ).setOrigin(0.5).setScrollFactor(0).setDepth(30);
+        const centerX = this.cameras.main.centerX;
+        const centerY = this.cameras.main.centerY;
 
-        const mainMenuButton = this.add.text(this.cameras.main.centerX, this.cameras.main.centerY + 50, 'Main Menu',
-            { fontFamily: 'Arial', fontSize: '32px', color: '#ffff00', stroke: '#000000', strokeThickness: 5, align: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }
-        ).setOrigin(0.5).setScrollFactor(0).setDepth(30).setInteractive();
+        const elapsedTime = this.gameTime - this.levelStartTime;
+        const totalSeconds = Math.floor(elapsedTime);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+        // Background for the message
+        this.add.rectangle(centerX, centerY, 450, 250, 0x000000, 0.8)
+            .setScrollFactor(0)
+            .setDepth(30);
+
+        this.add.text(centerX, centerY - 60, `Level ${this.currentLevel} Completed!`, {
+            fontFamily: 'Arial', fontSize: '32px', color: '#ffffff', align: 'center'
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(31);
+
+        this.add.text(centerX, centerY - 10, `Time: ${timeString}`, {
+            fontFamily: 'Arial', fontSize: '24px', color: '#ffffff', align: 'center'
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(31);
+
+        const mainMenuButton = this.add.text(centerX, centerY + 60, 'Main Menu', {
+            fontFamily: 'Arial', fontSize: '24px', color: '#00ff00', backgroundColor: '#333333',
+            padding: { x: 15, y: 8 }, align: 'center'
+        })
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(31)
+            .setInteractive();
 
         mainMenuButton.on('pointerdown', () => {
             this.scene.start('MainMenu');
         });
 
-        // For now, no "Next Level" button as we only have one level defined
-        // If you add more levels, you would add a button here to start `this.scene.start('Game', { level: this.currentLevel + 1 });`
+        // Future: Add "Next Level" button here if applicable
     }
 }
