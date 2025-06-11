@@ -45,13 +45,34 @@ export class Game extends Scene {
     private sliderHandleWidthConst: number;
     private sliderHandleHeightConst: number;
 
+    // Level specific properties
+    private currentLevel: number = 1;
+    private gameStarted: boolean = false;
+    private pressSpaceText: Phaser.GameObjects.Text;
+    private finishLine: {
+        startDot: Phaser.GameObjects.Ellipse,
+        endDot: Phaser.GameObjects.Ellipse,
+        line: Phaser.Geom.Line,
+        graphics: Phaser.GameObjects.Graphics // For visualizing the line if needed
+    };
+    private levelStartTime: number = 0;
+    private boatPreviousY: number; // For finish line check
+
     constructor() {
         super('Game');
     }
 
+    init(data: { level?: number }) {
+        this.currentLevel = data.level || 1;
+        this.gameStarted = false; // Reset game started state
+        this.gameTime = 0; // Reset game time for the level
+    }
+
     create() {
-        // Set world bounds
-        this.matter.world.setBounds(0, 0, 3000, 6000);
+        // Set world bounds explicitly, as matter.world.setBounds doesn't always reflect in localWorld.bounds as expected for width/height queries later.
+        const worldWidth = 3000;
+        const worldHeight = 6000;
+        this.matter.world.setBounds(0, 0, worldWidth, worldHeight);
         this.camera = this.cameras.main;
         // Blue background for sea
         this.add.rectangle(1500, 3000, 3000, 6000, 0x1e90ff).setDepth(-2);
@@ -153,15 +174,64 @@ export class Game extends Scene {
         });
         // World bounds collision
         this.boat.body.onCollideCallback = (data: any) => {
-            if (data.bodyB.isStatic && data.bodyB.label === 'Rectangle Body') {
-                this.scene.start('GameOver');
+            if (data.bodyB.isStatic && (data.bodyB.label === 'Rectangle Body' || data.bodyB.label === 'Circle Body')) {
+                this.scene.start('GameOver', { level: this.currentLevel, time: this.gameTime });
             }
         };
 
         this._createDataViewOverlayElements();
+
+        // "Press Space to Start" text
+        this.pressSpaceText = this.add.text(this.cameras.main.centerX, this.cameras.main.centerY, 'Press SPACE to Start', {
+            fontFamily: 'Arial', fontSize: '48px', color: '#ffffff', stroke: '#000000', strokeThickness: 6, align: 'center'
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(30);
+
+        // Finish Line - at the top of the map
+        const finishLineY = 100;
+        const finishLineMargin = 200;
+        // Use the worldWidth defined at the start of create()
+        this.finishLine = {
+            startDot: this.add.ellipse(finishLineMargin, finishLineY, 20, 20, 0xff0000).setDepth(5),
+            endDot: this.add.ellipse(worldWidth - finishLineMargin, finishLineY, 20, 20, 0xff0000).setDepth(5),
+            line: new Phaser.Geom.Line(finishLineMargin, finishLineY, worldWidth - finishLineMargin, finishLineY),
+            graphics: this.add.graphics({ lineStyle: { width: 5, color: 0xff0000 } }).setDepth(5)
+        };
+        this.finishLine.graphics.strokeLineShape(this.finishLine.line);
+
+        // Pause physics initially
+        this.matter.world.pause();
+
+        if (this.input.keyboard) {
+            this.input.keyboard.on('keydown-SPACE', () => {
+                if (!this.gameStarted) {
+                    this.startGame();
+                }
+            });
+        } else {
+            console.error("Keyboard input not available for spacebar.");
+        }
+        // Initialize boatPreviousY with the boat's starting y position
+        this.boatPreviousY = this.boat.getPosition().y;
+    }
+
+    private startGame() {
+        this.gameStarted = true;
+        this.pressSpaceText.setVisible(false);
+        this.matter.world.resume();
+        this.levelStartTime = this.gameTime; // Record start time when space is pressed
+        this.boatPreviousY = this.boat.getPosition().y; // Ensure this is set when the game actually starts moving
     }
 
     update(time: number, delta: number) { // time parameter is used by Phaser, keep it
+        const currentBoatY = this.boat.getPosition().y;
+        if (!this.gameStarted) {
+            // Game hasn't started, camera might be fixed or follow a pre-defined path
+            // For now, let's keep it centered on where the boat will be, but boat is not moving
+            this.camera.centerOn(this.boat.getPosition().x, this.boat.getPosition().y - 250);
+            this._updateDataViewOverlay(); // Keep overlay updated even if game is paused
+            return; // Don't run game logic if not started
+        }
+
         this.gameTime += delta / 1000; // Update game time in seconds
 
         this.boat.updateWindVector(this.windVector)
@@ -181,6 +251,8 @@ export class Game extends Scene {
         }
 
         this._updateDataViewOverlay();
+        this.checkFinishLine(currentBoatY);
+        this.boatPreviousY = currentBoatY; // Update previous Y for the next frame's check
     }
 
     registerWSAD() {
@@ -362,8 +434,9 @@ export class Game extends Scene {
     private _updateDataViewOverlay() {
         if (!this.boat || !this.dataViewOverlayContainer) return;
 
-        // Update Time
-        const totalSeconds = Math.floor(this.gameTime);
+        // Update Time - show level time if game started, else total game session time or 00:00:00
+        const displayTime = this.gameStarted ? this.gameTime - this.levelStartTime : 0;
+        const totalSeconds = Math.floor(displayTime);
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
@@ -394,5 +467,44 @@ export class Game extends Scene {
         const sailHandleX = this.sailAngleSliderTrack.x + (sailAngle / 90) * (this.sliderTrackWidthConst - this.sliderHandleWidthConst);
         this.sailAngleSliderHandle.setPosition(sailHandleX, this.sailAngleSliderTrack.y + this.sliderTrackHeightConst / 2);
         this.sailAngleValueText.setText(`${sailAngle.toFixed(0)}°`);
+    }
+
+    private checkFinishLine(currentBoatY: number) {
+        if (!this.gameStarted) return;
+
+        const boatPositionX = this.boat.getPosition().x;
+
+        if (currentBoatY < this.finishLine.line.y1 &&
+            boatPositionX >= this.finishLine.line.x1 &&
+            boatPositionX <= this.finishLine.line.x2) {
+
+            // Check if previous y was at or below the line, and current y is above
+            if (this.boatPreviousY >= this.finishLine.line.y1) {
+                this.levelCompleted();
+            }
+        }
+    }
+
+    private levelCompleted() {
+        this.gameStarted = false; // Stop game updates
+        this.matter.world.pause();
+        const levelTime = this.gameTime - this.levelStartTime;
+
+        // Display level completed message
+        this.add.text(this.cameras.main.centerX, this.cameras.main.centerY - 50,
+            `Level ${this.currentLevel} Completed!\nTime: ${levelTime.toFixed(2)}s`,
+            { fontFamily: 'Arial', fontSize: '40px', color: '#00ff00', stroke: '#000000', strokeThickness: 6, align: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(30);
+
+        const mainMenuButton = this.add.text(this.cameras.main.centerX, this.cameras.main.centerY + 50, 'Main Menu',
+            { fontFamily: 'Arial', fontSize: '32px', color: '#ffff00', stroke: '#000000', strokeThickness: 5, align: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(30).setInteractive();
+
+        mainMenuButton.on('pointerdown', () => {
+            this.scene.start('MainMenu');
+        });
+
+        // For now, no "Next Level" button as we only have one level defined
+        // If you add more levels, you would add a button here to start `this.scene.start('Game', { level: this.currentLevel + 1 });`
     }
 }
